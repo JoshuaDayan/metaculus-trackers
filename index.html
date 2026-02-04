@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metaculus Trackers</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            text-align: center;
+        }
+
+        .brand {
+            font-family: 'Cinzel', serif;
+            font-size: 2.5em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 50px;
+            font-size: 1.1em;
+        }
+
+        .cards {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px 30px;
+            width: 320px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(102, 126, 234, 0.5);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .card-description {
+            color: #aaa;
+            line-height: 1.6;
+            font-size: 0.95em;
+        }
+
+        .currency-card .card-icon { color: #4ade80; }
+        .bond-card .card-icon { color: #60a5fa; }
+
+        @media (max-width: 700px) {
+            .brand { font-size: 1.8em; }
+            .cards { flex-direction: column; align-items: center; }
+            .card { width: 100%; max-width: 320px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="brand">Metaculus Trackers</h1>
+        <p class="subtitle">February 2026 Financial Market Tracking</p>
+
+        <div class="cards">
+            <a href="/february-2026-currency-tracker.html" class="card currency-card">
+                <div class="card-icon">$</div>
+                <h2 class="card-title">Currency Tracker</h2>
+                <p class="card-description">Track USD exchange rates against major world currencies including EUR, GBP, JPY, and more.</p>
+            </a>
+
+            <a href="/german-bond-tracker.html" class="card bond-card">
+                <div class="card-icon">%</div>
+                <h2 class="card-title">Bond Yield Tracker</h2>
+                <p class="card-description">Monitor the German 10-Year government bond yield with historical comparisons.</p>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
