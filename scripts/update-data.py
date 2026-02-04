@@ -2,6 +2,7 @@
 """Metaculus Tracker Data Updater - Scrapes Yahoo Finance + Bundesbank"""
 
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,12 +37,11 @@ def fetch_bundesbank_yield():
         return None
 
 
-def update_currency_html(rates: dict):
+def update_currency_html(rates):
     if not CURRENCY_FILE.exists():
-        return
+        return False
 
     content = CURRENCY_FILE.read_text()
-
     block = "const CURRENT = {\n"
     for code in CURRENCIES:
         if code in rates:
@@ -60,11 +60,12 @@ def update_currency_html(rates: dict):
 
     CURRENCY_FILE.write_text(content)
     print(f"Updated {CURRENCY_FILE}")
+    return True
 
 
-def update_bond_html(yld: float):
+def update_bond_html(yld):
     if not BOND_FILE.exists():
-        return
+        return False
 
     content = BOND_FILE.read_text()
     content = re.sub(
@@ -83,18 +84,50 @@ def update_bond_html(yld: float):
 
     BOND_FILE.write_text(content)
     print(f"Updated {BOND_FILE}")
+    return True
 
 
 if __name__ == "__main__":
-    print("Fetching currencies...")
-    rates = {c: fetch_yahoo_currency(c) for c in CURRENCIES}
-    rates = {k: v for k, v in rates.items() if v is not None}
-    if rates:
-        update_currency_html(rates)
+    currency_success = False
+    bond_success = False
 
-    print("Fetching bond yield...")
-    yld = fetch_bundesbank_yield()
-    if yld is not None:
-        update_bond_html(yld)
+    # Try currency update first (more complex, might fail)
+    print("Fetching currencies from Yahoo Finance...")
+    try:
+        rates = {c: fetch_yahoo_currency(c) for c in CURRENCIES}
+        rates = {k: v for k, v in rates.items() if v}
+        if rates:
+            print(f"Got rates for: {', '.join(rates.keys())}")
+            if update_currency_html(rates):
+                currency_success = True
+        else:
+            print("Warning: No currency rates fetched")
+    except Exception as e:
+        print(f"Currency update failed: {e}")
 
-    print("Done!")
+    # Always try bond update (simpler, more reliable)
+    print("\nFetching bond yield from Deutsche Bundesbank...")
+    try:
+        yld = fetch_bundesbank_yield()
+        if yld:
+            print(f"Got yield: {yld}%")
+            if update_bond_html(yld):
+                bond_success = True
+        else:
+            print("Warning: No bond yield fetched")
+    except Exception as e:
+        print(f"Bond update failed: {e}")
+
+    # Summary
+    print("\n" + "=" * 40)
+    print("Summary:")
+    print(f"  Currency tracker: {'SUCCESS' if currency_success else 'FAILED'}")
+    print(f"  Bond tracker: {'SUCCESS' if bond_success else 'FAILED'}")
+
+    if not currency_success and not bond_success:
+        print("\nBoth updates failed!")
+        sys.exit(1)
+    elif not currency_success:
+        print("\nNote: Currency update failed but bond update succeeded")
+
+    print("\nDone!")
