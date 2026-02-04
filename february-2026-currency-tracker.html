@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>February 2026 Currency Tracker | Metaculus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        /* Navigation */
+        .nav {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .nav a {
+            display: inline-block;
+            padding: 10px 20px;
+            background: rgba(123, 44, 191, 0.3);
+            border: 1px solid rgba(123, 44, 191, 0.5);
+            border-radius: 8px;
+            color: #00d4ff;
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .nav a:hover {
+            background: rgba(123, 44, 191, 0.5);
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 768px) {
+            .nav { position: static; margin-bottom: 15px; text-align: center; }
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 25px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
+
+        .foundation-subtitle {
+            font-family: 'Cinzel', serif;
+            font-size: 0.75rem;
+            color: #b8860b;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, rgba(184, 134, 11, 0.1), rgba(218, 165, 32, 0.05));
+            border: 1px solid rgba(184, 134, 11, 0.3);
+            border-radius: 8px;
+            letter-spacing: 1px;
+            display: inline-block;
+        }
+
+        .question-box {
+            background: rgba(123, 44, 191, 0.1);
+            border: 1px solid rgba(123, 44, 191, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #ccc;
+        }
+
+        .question-box strong { color: #00d4ff; }
+
+        .source-box {
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.1), rgba(34, 197, 94, 0.05));
+            border: 1px solid rgba(74, 222, 128, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .source-box h3 {
+            color: #4ade80;
+            margin-bottom: 12px;
+            font-size: 1rem;
+        }
+
+        .source-box p {
+            font-size: 0.85rem;
+            color: #ccc;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding: 15px 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .status-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+
+        .status-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+        }
+
+        .leader-banner {
+            text-align: center;
+            padding: 30px;
+            margin-bottom: 25px;
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.12), rgba(34, 197, 94, 0.06));
+            border-radius: 16px;
+            border: 2px solid rgba(74, 222, 128, 0.3);
+        }
+
+        .leader-banner.negative {
+            background: linear-gradient(135deg, rgba(248, 113, 113, 0.12), rgba(239, 68, 68, 0.06));
+            border-color: rgba(248, 113, 113, 0.3);
+        }
+
+        .leader-label { font-size: 0.85rem; color: #888; margin-bottom: 8px; letter-spacing: 1px; }
+        .leader-currency { font-size: 2.5rem; font-weight: 700; margin-bottom: 5px; }
+        .leader-change { font-size: 1.6rem; font-weight: 600; }
+        .leader-change.positive { color: #4ade80; }
+        .leader-change.negative { color: #f87171; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .currency-card {
+            background: rgba(255,255,255,0.04);
+            border-radius: 16px;
+            padding: 22px;
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: all 0.2s;
+        }
+
+        .currency-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        .currency-card.leader {
+            border: 2px solid #4ade80;
+            box-shadow: 0 0 40px rgba(74, 222, 128, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .currency-code { font-size: 1.6rem; font-weight: 700; }
+        .currency-name { font-size: 0.8rem; color: #666; margin-top: 2px; }
+
+        .rank-badge {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .rank-1 { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #000; }
+        .rank-2 { background: linear-gradient(135deg, #c0c0c0, #a0a0a0); color: #000; }
+        .rank-3 { background: linear-gradient(135deg, #cd7f32, #a0522d); color: #fff; }
+        .rank-other { background: rgba(255,255,255,0.08); color: #666; }
+
+        .values-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .value-box {
+            background: rgba(0,0,0,0.25);
+            padding: 12px;
+            border-radius: 10px;
+        }
+
+        .value-label { font-size: 0.7rem; color: #555; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .value-number { font-size: 1.05rem; font-weight: 600; font-family: 'Monaco', 'Consolas', monospace; }
+
+        .change-display {
+            text-align: center;
+            padding: 16px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+        }
+
+        .change-percent { font-size: 1.9rem; font-weight: 700; }
+        .change-percent.positive { color: #4ade80; }
+        .change-percent.negative { color: #f87171; }
+        .change-percent.neutral { color: #fbbf24; }
+
+        .chart-container {
+            background: rgba(255,255,255,0.04);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
+        .chart-wrapper { position: relative; height: 320px; }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .data-table th, .data-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .data-table th {
+            background: rgba(255,255,255,0.04);
+            font-weight: 600;
+            color: #888;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table tr:hover { background: rgba(255,255,255,0.02); }
+
+        .yahoo-links {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(0, 212, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 12px;
+        }
+
+        .yahoo-links h4 { color: #00d4ff; margin-bottom: 12px; font-size: 0.9rem; }
+        .yahoo-links-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .yahoo-links a {
+            display: block;
+            color: #888;
+            text-decoration: none;
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .yahoo-links a:hover {
+            color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .info-section {
+            margin-top: 30px;
+            padding: 25px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .info-section h3 { margin-bottom: 15px; color: #00d4ff; font-size: 1rem; }
+        .info-section p { color: #888; line-height: 1.7; margin-bottom: 12px; font-size: 0.9rem; }
+        .info-section a { color: #00d4ff; text-decoration: none; }
+        .info-section a:hover { text-decoration: underline; }
+
+        .formula-box {
+            background: rgba(0,0,0,0.3);
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin: 15px 0;
+            border-left: 3px solid #7b2cbf;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.5rem; }
+            .grid { grid-template-columns: 1fr; }
+            .status-bar { flex-direction: column; text-align: center; }
+            .leader-currency { font-size: 2rem; }
+            .foundation-subtitle { font-size: 0.65rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="german-bond-tracker.html">🇩🇪 Bond Tracker</a>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>🌍 February 2026 Currency Tracker</h1>
+            <p class="subtitle">Metaculus Question: Which major currency will increase most (or decrease least) vs USD?</p>
+            <div class="foundation-subtitle">
+                Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
+            </div>
+            <div class="question-box">
+                <strong>Resolution:</strong> March 1, 2026 at 2 PM ET via Yahoo Finance Historical Data<br>
+                <strong>Formula:</strong> <code>(Close_Feb28 − Close_Jan31) / Close_Jan31 × 100</code>
+            </div>
+        </header>
+
+        <div class="source-box">
+            <h3>✅ 100% Yahoo Finance Data</h3>
+            <p><strong>All values scraped directly from Yahoo Finance.</strong></p>
+            <p><strong>Baseline:</strong> January 30, 2026 (Friday close — Jan 31 was Saturday)</p>
+            <p><strong>Last Updated:</strong> <span id="lastUpdated" style="color:#4ade80; font-weight: bold;">February 3, 2026 at 10:25 PM GMT</span></p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot"></div>
+                <span>Yahoo Finance Verified</span>
+            </div>
+            <div class="status-item">
+                <strong>Baseline:</strong>&nbsp;Jan 30, 2026
+            </div>
+            <div class="status-item">
+                <strong>Current:</strong>&nbsp;Feb 3, 2026
+            </div>
+        </div>
+
+        <div id="leaderBanner" class="leader-banner">
+            <div class="leader-label">🏆 CURRENT LEADER</div>
+            <div class="leader-currency" id="leaderCurrency"></div>
+            <div class="leader-change" id="leaderChange"></div>
+        </div>
+
+        <div id="currencyGrid" class="grid"></div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">📊 February 2026 Performance Ranking (% Change from Baseline)</h3>
+            <div class="chart-wrapper">
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">📋 Complete Data Table</h3>
+            <table class="data-table" id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Currency</th>
+                        <th>Baseline (Jan 30)</th>
+                        <th>Current (Feb 3)</th>
+                        <th>Absolute Δ</th>
+                        <th>% Change</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+
+            <div class="yahoo-links">
+                <h4>🔗 Verify on Yahoo Finance</h4>
+                <div class="yahoo-links-grid">
+                    <a href="https://finance.yahoo.com/quote/EURUSD=X/history/" target="_blank">EUR/USD</a>
+                    <a href="https://finance.yahoo.com/quote/JPYUSD=X/history/" target="_blank">JPY/USD</a>
+                    <a href="https://finance.yahoo.com/quote/GBPUSD=X/history/" target="_blank">GBP/USD</a>
+                    <a href="https://finance.yahoo.com/quote/CNYUSD=X/history/" target="_blank">CNY/USD</a>
+                    <a href="https://finance.yahoo.com/quote/CHFUSD=X/history/" target="_blank">CHF/USD</a>
+                    <a href="https://finance.yahoo.com/quote/AUDUSD=X/history/" target="_blank">AUD/USD</a>
+                    <a href="https://finance.yahoo.com/quote/CADUSD=X/history/" target="_blank">CAD/USD</a>
+                    <a href="https://finance.yahoo.com/quote/MXNUSD=X/history/" target="_blank">MXN/USD</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h3>📖 How This Tracker Works</h3>
+            <p>This tracker monitors 8 major currencies against the US Dollar throughout February 2026.</p>
+            <div class="formula-box">
+                % Change = (Current_Price − Baseline_Price) / Baseline_Price × 100
+            </div>
+            <p><strong>Data Source:</strong> All values scraped directly from <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a> — the same source Metaculus will use for resolution.</p>
+            <p><strong>Updates:</strong> This tracker shows point-in-time data. To request an update with fresh Yahoo Finance values, ask your friendly neighborhood AI assistant.</p>
+            <p><strong>Resolution:</strong> March 1, 2026 at 2 PM ET. The currency with the highest percentage change wins.</p>
+        </div>
+    </div>
+
+    <script>
+        // ===========================================
+        // 100% YAHOO FINANCE DATA
+        // Scraped directly from finance.yahoo.com
+        // ===========================================
+
+        // Baseline: January 30, 2026 (Friday close)
+        // Source: finance.yahoo.com/quote/XXXUSD=X/history/
+        const BASELINE = {
+            EUR: 1.1966,
+            GBP: 1.3806,
+            JPY: 0.0065,
+            CNY: 0.1439,
+            CHF: 1.3082,
+            AUD: 0.7047,
+            CAD: 0.7412,
+            MXN: 0.0581
+        };
+
+        // Current: February 3, 2026 at 10:25 PM GMT
+        // Source: finance.yahoo.com/quote/XXXUSD=X/
+        const CURRENT = {
+            EUR: 1.1820,
+            GBP: 1.3696,
+            JPY: 0.0064,
+            CNY: 0.1442,
+            CHF: 1.2901,
+            AUD: 0.7021,
+            CAD: 0.7334,
+            MXN: 0.0581
+        };
+
+        const CURRENCIES = {
+            EUR: { name: 'Euro', flag: '🇪🇺' },
+            GBP: { name: 'British Pound', flag: '🇬🇧' },
+            JPY: { name: 'Japanese Yen', flag: '🇯🇵' },
+            CNY: { name: 'Chinese Yuan', flag: '🇨🇳' },
+            CHF: { name: 'Swiss Franc', flag: '🇨🇭' },
+            AUD: { name: 'Australian Dollar', flag: '🇦🇺' },
+            CAD: { name: 'Canadian Dollar', flag: '🇨🇦' },
+            MXN: { name: 'Mexican Peso', flag: '🇲🇽' }
+        };
+
+        // Calculate results
+        function calculateResults() {
+            const results = [];
+            for (const code of Object.keys(CURRENCIES)) {
+                const baseline = BASELINE[code];
+                const current = CURRENT[code];
+                const change = ((current - baseline) / baseline) * 100;
+                results.push({ code, baseline, current, change });
+            }
+            results.sort((a, b) => b.change - a.change);
+            return results;
+        }
+
+        // Format helpers
+        function formatNum(n) {
+            if (n < 0.01) return n.toFixed(6);
+            if (n < 1) return n.toFixed(4);
+            return n.toFixed(4);
+        }
+
+        function formatPercent(n) {
+            const sign = n >= 0 ? '+' : '';
+            return `${sign}${n.toFixed(4)}%`;
+        }
+
+        function getRankClass(rank) {
+            if (rank === 1) return 'rank-1';
+            if (rank === 2) return 'rank-2';
+            if (rank === 3) return 'rank-3';
+            return 'rank-other';
+        }
+
+        function getChangeClass(change) {
+            if (change > 0.001) return 'positive';
+            if (change < -0.001) return 'negative';
+            return 'neutral';
+        }
+
+        // Render functions
+        function renderLeader(results) {
+            const leader = results[0];
+            const isPositive = leader.change >= 0;
+            const banner = document.getElementById('leaderBanner');
+            banner.className = `leader-banner ${isPositive ? '' : 'negative'}`;
+
+            document.getElementById('leaderCurrency').textContent =
+                `${CURRENCIES[leader.code].flag} ${leader.code} (${CURRENCIES[leader.code].name})`;
+            document.getElementById('leaderChange').textContent = formatPercent(leader.change);
+            document.getElementById('leaderChange').className =
+                `leader-change ${isPositive ? 'positive' : 'negative'}`;
+        }
+
+        function renderCards(results) {
+            const grid = document.getElementById('currencyGrid');
+            grid.innerHTML = results.map((item, i) => {
+                const rank = i + 1;
+                const info = CURRENCIES[item.code];
+                const changeClass = getChangeClass(item.change);
+
+                return `
+                    <div class="currency-card ${rank === 1 ? 'leader' : ''}">
+                        <div class="card-header">
+                            <div>
+                                <div class="currency-code">${info.flag} ${item.code}</div>
+                                <div class="currency-name">${info.name}</div>
+                            </div>
+                            <div class="rank-badge ${getRankClass(rank)}">${rank}</div>
+                        </div>
+                        <div class="values-grid">
+                            <div class="value-box">
+                                <div class="value-label">Baseline (Jan 30)</div>
+                                <div class="value-number">${formatNum(item.baseline)}</div>
+                            </div>
+                            <div class="value-box">
+                                <div class="value-label">Current (Feb 3)</div>
+                                <div class="value-number">${formatNum(item.current)}</div>
+                            </div>
+                        </div>
+                        <div class="change-display">
+                            <div class="change-percent ${changeClass}">${formatPercent(item.change)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTable(results) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = results.map((item, i) => {
+                const rank = i + 1;
+                const absChange = item.current - item.baseline;
+                const changeSign = absChange >= 0 ? '+' : '';
+                const color = item.change >= 0 ? '#4ade80' : '#f87171';
+
+                return `
+                    <tr>
+                        <td><span class="rank-badge ${getRankClass(rank)}" style="display:inline-flex;width:28px;height:28px;font-size:0.85rem;">${rank}</span></td>
+                        <td><strong>${item.code}</strong> — ${CURRENCIES[item.code].name}</td>
+                        <td style="font-family:monospace;">${formatNum(item.baseline)}</td>
+                        <td style="font-family:monospace;">${formatNum(item.current)}</td>
+                        <td style="font-family:monospace;color:${color}">${changeSign}${formatNum(absChange)}</td>
+                        <td style="font-weight:700;color:${color}">${formatPercent(item.change)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderChart(results) {
+            const ctx = document.getElementById('barChart').getContext('2d');
+            const labels = results.map(d => d.code);
+            const data = results.map(d => d.change);
+            // Use slightly different colors for zero values (gold/neutral)
+            const colors = data.map(v => {
+                if (Math.abs(v) < 0.0001) return 'rgba(251, 191, 36, 0.8)'; // gold for zero
+                return v >= 0 ? 'rgba(74, 222, 128, 0.8)' : 'rgba(248, 113, 113, 0.8)';
+            });
+            const borderColors = data.map(v => {
+                if (Math.abs(v) < 0.0001) return '#fbbf24';
+                return v >= 0 ? '#4ade80' : '#f87171';
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: '% Change',
+                        data,
+                        backgroundColor: colors,
+                        borderColor: borderColors,
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        minBarLength: 8  // Ensures zero values still show a small bar
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => formatPercent(ctx.raw)
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: v => v.toFixed(2) + '%' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', font: { weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const results = calculateResults();
+            renderLeader(results);
+            renderCards(results);
+            renderTable(results);
+            renderChart(results);
+        });
+    </script>
+</body>
+</html>
