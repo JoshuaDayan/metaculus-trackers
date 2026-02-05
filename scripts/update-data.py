@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Metaculus Tracker Data Updater - Scrapes Yahoo Finance + Bundesbank"""
+"""Metaculus Tracker Data Updater (legacy)
+
+This script historically baked point-in-time data into static HTML files and
+committed the changes. The site now prefers live updates via Netlify Functions,
+but this script remains useful for updating the fallback snapshot values
+embedded in the pages.
+"""
 
 import re
 import sys
@@ -42,13 +48,13 @@ def update_currency_html(rates):
         return False
 
     content = CURRENCY_FILE.read_text()
-    block = "const CURRENT = {\n"
+    block = "let CURRENT = {\n"
     for code in CURRENCIES:
         if code in rates:
             block += f"            {code}: {rates[code]},\n"
     block = block.rstrip(",\n") + "\n        };"
 
-    content = re.sub(r"const CURRENT = \{[^}]+\};", block, content)
+    content = re.sub(r"(?:const|let) CURRENT = \{[^}]+\};", block, content)
 
     now = datetime.now(timezone.utc)
     ts = now.strftime("%B %d, %Y at %I:%M %p GMT")
@@ -69,8 +75,8 @@ def update_bond_html(yld):
 
     content = BOND_FILE.read_text()
     content = re.sub(
-        r"const CURRENT_YIELD = [\d.]+;",
-        f"const CURRENT_YIELD = {yld};",
+        r"(?:const|let) CURRENT_YIELD = [\d.]+;",
+        f"let CURRENT_YIELD = {yld};",
         content,
     )
 

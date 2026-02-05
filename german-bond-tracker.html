@@ -394,10 +394,10 @@
                 <span>Bundesbank Verified</span>
             </div>
             <div class="status-item">
-                <strong>Baseline:</strong>&nbsp;Jan 30, 2026
+                <strong>Baseline:</strong>&nbsp;<span id="baselineDateLabel">Jan 30, 2026</span>
             </div>
             <div class="status-item">
-                <strong>Current:</strong>&nbsp;Feb 3, 2026
+                <strong>Current:</strong>&nbsp;<span id="currentDateLabel">Loading…</span>
             </div>
         </div>
 
@@ -412,7 +412,7 @@
                 <div class="card-header">
                     <div>
                         <div class="card-title">📈 Baseline Yield</div>
-                        <div class="card-subtitle">January 30, 2026</div>
+                        <div class="card-subtitle" id="baselineCardDateLabel">January 30, 2026</div>
                     </div>
                 </div>
                 <div class="values-grid">
@@ -441,7 +441,7 @@
                 <div class="card-header">
                     <div>
                         <div class="card-title">📊 Current Status</div>
-                        <div class="card-subtitle">February 3, 2026</div>
+                        <div class="card-subtitle" id="currentCardDateLabel">Loading…</div>
                     </div>
                 </div>
                 <div class="values-grid">
@@ -512,7 +512,7 @@
                     <tr>
                         <td><strong>Current Yield</strong></td>
                         <td style="font-family:monospace;" id="tblCurrent">2.88%</td>
-                        <td>February 3, 2026</td>
+                        <td><span id="currentTableDateLabel">Loading…</span></td>
                     </tr>
                     <tr>
                         <td><strong>Current Change</strong></td>
@@ -538,7 +538,7 @@
             <p><strong>Resolution:</strong> YES if any trading day in February 2026 shows a yield at least 20 basis points (0.20%) higher or lower than the January 30, 2026 baseline.</p>
             <p><strong>1 basis point = 0.01%</strong>, so 20 basis points = 0.20%.</p>
             <p><strong>Data Source:</strong> All values from <a href="https://www.bundesbank.de" target="_blank">Deutsche Bundesbank</a> official time series — the resolution source for this Metaculus question.</p>
-            <p><strong>Updates:</strong> This tracker shows point-in-time data. Updated once a day</p>
+            <p><strong>Updates:</strong> Live via a Netlify Function (cached) — no redeploys required for new data.</p>
         </div>
     </div>
 
@@ -550,81 +550,120 @@
         // ===========================================
 
         const BASELINE_YIELD = 2.85;  // Jan 30, 2026 (Bundesbank)
-        const CURRENT_YIELD = 2.88;   // Feb 3, 2026 (Bundesbank)
+        let CURRENT_YIELD = 2.88;     // fallback only; live fetch will overwrite
         const THRESHOLD_BP = 20;      // ±20 basis points
 
-        // Calculate values
-        const changePercent = CURRENT_YIELD - BASELINE_YIELD;
-        const changeBp = Math.round(changePercent * 100);
-        const upperTrigger = BASELINE_YIELD + (THRESHOLD_BP / 100);
-        const lowerTrigger = BASELINE_YIELD - (THRESHOLD_BP / 100);
+        let CURRENT_DATE_TEXT = 'Latest available';
+        const BASELINE_DATE_TEXT = 'January 30, 2026';
 
-        // Check if threshold breached
-        const breachedUpper = CURRENT_YIELD >= upperTrigger;
-        const breachedLower = CURRENT_YIELD <= lowerTrigger;
-        const breached = breachedUpper || breachedLower;
-
-        // Distance to nearest threshold
-        const distanceToUpper = Math.round((upperTrigger - CURRENT_YIELD) * 100);
-        const distanceToLower = Math.round((CURRENT_YIELD - lowerTrigger) * 100);
-        const distanceToThreshold = Math.min(distanceToUpper, distanceToLower);
-
-        // Update resolution banner
-        const banner = document.getElementById('resolutionBanner');
-        const statusValue = document.getElementById('statusValue');
-        const statusExplanation = document.getElementById('statusExplanation');
-
-        if (breached) {
-            banner.className = 'resolution-banner yes';
-            statusValue.className = 'resolution-value yes';
-            statusValue.textContent = 'YES';
-            statusExplanation.textContent = `Threshold breached! Yield moved ${Math.abs(changeBp)}bp from baseline.`;
-        } else {
-            banner.className = 'resolution-banner pending';
-            statusValue.className = 'resolution-value pending';
-            statusValue.textContent = 'PENDING';
-            statusExplanation.textContent = `${Math.abs(changeBp)}bp from baseline • ${distanceToThreshold}bp until threshold`;
+        function parseISODate(dateStr) {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+            if (!m) return null;
+            const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+            if (Number.isNaN(d.getTime())) return null;
+            return d;
         }
 
-        // Update data cards
-        document.getElementById('baselineYield').textContent = BASELINE_YIELD.toFixed(2) + '%';
-        document.getElementById('currentYield').textContent = CURRENT_YIELD.toFixed(2) + '%';
-        document.getElementById('upperTrigger').textContent = upperTrigger.toFixed(2) + '%';
-        document.getElementById('lowerTrigger').textContent = lowerTrigger.toFixed(2) + '%';
-        document.getElementById('distanceValue').textContent = distanceToThreshold + 'bp';
+        function formatMonthDayYear(dateStr) {
+            const d = parseISODate(dateStr);
+            if (!d) return dateStr;
+            return d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric', timeZone: 'UTC' });
+        }
 
-        const changeEl = document.getElementById('changeValue');
-        changeEl.textContent = (changeBp >= 0 ? '+' : '') + changeBp + 'bp';
-        changeEl.className = 'change-value ' + (changeBp > 0 ? 'positive' : changeBp < 0 ? 'negative' : 'neutral');
+        function setDateLabels() {
+            const baselineEl = document.getElementById('baselineDateLabel');
+            const currentEl = document.getElementById('currentDateLabel');
+            const baselineCardEl = document.getElementById('baselineCardDateLabel');
+            const currentCardEl = document.getElementById('currentCardDateLabel');
+            const currentTableEl = document.getElementById('currentTableDateLabel');
 
-        // Update gauge
-        const gaugeMarker = document.getElementById('gaugeMarker');
-        const gaugeLabel = document.getElementById('gaugeLabel');
-        const gaugePosition = 50 + (changeBp / THRESHOLD_BP * 50);
-        const clampedPosition = Math.max(0, Math.min(100, gaugePosition));
-        gaugeMarker.style.left = clampedPosition + '%';
+            if (baselineEl) baselineEl.textContent = BASELINE_DATE_TEXT;
+            if (currentEl) currentEl.textContent = CURRENT_DATE_TEXT;
+            if (baselineCardEl) baselineCardEl.textContent = BASELINE_DATE_TEXT;
+            if (currentCardEl) currentCardEl.textContent = CURRENT_DATE_TEXT;
+            if (currentTableEl) currentTableEl.textContent = CURRENT_DATE_TEXT;
+        }
 
-        const direction = changeBp >= 0 ? 'above' : 'below';
-        gaugeLabel.textContent = `${changeBp >= 0 ? '+' : ''}${changeBp}bp ${direction} baseline`;
+        let progressChartInstance = null;
 
-        // Update table
-        document.getElementById('tblBaseline').textContent = BASELINE_YIELD.toFixed(2) + '%';
-        document.getElementById('tblUpper').textContent = upperTrigger.toFixed(2) + '%';
-        document.getElementById('tblLower').textContent = lowerTrigger.toFixed(2) + '%';
-        document.getElementById('tblCurrent').textContent = CURRENT_YIELD.toFixed(2) + '%';
+        function render() {
+            // Calculate values
+            const changePercent = CURRENT_YIELD - BASELINE_YIELD;
+            const changeBp = Math.round(changePercent * 100);
+            const upperTrigger = BASELINE_YIELD + (THRESHOLD_BP / 100);
+            const lowerTrigger = BASELINE_YIELD - (THRESHOLD_BP / 100);
 
-        const tblChange = document.getElementById('tblChange');
-        tblChange.textContent = (changeBp >= 0 ? '+' : '') + changeBp + 'bp';
-        tblChange.style.color = changeBp > 0 ? '#4ade80' : changeBp < 0 ? '#f87171' : '#fbbf24';
+            // Check if threshold breached
+            const breachedUpper = CURRENT_YIELD >= upperTrigger;
+            const breachedLower = CURRENT_YIELD <= lowerTrigger;
+            const breached = breachedUpper || breachedLower;
 
-        // Progress Chart
-        document.addEventListener('DOMContentLoaded', () => {
+            // Distance to nearest threshold
+            const distanceToUpper = Math.round((upperTrigger - CURRENT_YIELD) * 100);
+            const distanceToLower = Math.round((CURRENT_YIELD - lowerTrigger) * 100);
+            const distanceToThreshold = Math.min(distanceToUpper, distanceToLower);
+
+            setDateLabels();
+
+            // Update resolution banner
+            const banner = document.getElementById('resolutionBanner');
+            const statusValue = document.getElementById('statusValue');
+            const statusExplanation = document.getElementById('statusExplanation');
+
+            if (breached) {
+                banner.className = 'resolution-banner yes';
+                statusValue.className = 'resolution-value yes';
+                statusValue.textContent = 'YES';
+                statusExplanation.textContent = `Threshold breached! Yield moved ${Math.abs(changeBp)}bp from baseline.`;
+            } else {
+                banner.className = 'resolution-banner pending';
+                statusValue.className = 'resolution-value pending';
+                statusValue.textContent = 'PENDING';
+                statusExplanation.textContent = `${Math.abs(changeBp)}bp from baseline • ${distanceToThreshold}bp until threshold`;
+            }
+
+            // Update data cards
+            document.getElementById('baselineYield').textContent = BASELINE_YIELD.toFixed(2) + '%';
+            document.getElementById('currentYield').textContent = CURRENT_YIELD.toFixed(2) + '%';
+            document.getElementById('upperTrigger').textContent = upperTrigger.toFixed(2) + '%';
+            document.getElementById('lowerTrigger').textContent = lowerTrigger.toFixed(2) + '%';
+            document.getElementById('distanceValue').textContent = distanceToThreshold + 'bp';
+
+            const changeEl = document.getElementById('changeValue');
+            changeEl.textContent = (changeBp >= 0 ? '+' : '') + changeBp + 'bp';
+            changeEl.className = 'change-value ' + (changeBp > 0 ? 'positive' : changeBp < 0 ? 'negative' : 'neutral');
+
+            // Update gauge
+            const gaugeMarker = document.getElementById('gaugeMarker');
+            const gaugeLabel = document.getElementById('gaugeLabel');
+            const gaugePosition = 50 + (changeBp / THRESHOLD_BP * 50);
+            const clampedPosition = Math.max(0, Math.min(100, gaugePosition));
+            gaugeMarker.style.left = clampedPosition + '%';
+
+            const direction = changeBp >= 0 ? 'above' : 'below';
+            gaugeLabel.textContent = `${changeBp >= 0 ? '+' : ''}${changeBp}bp ${direction} baseline`;
+
+            // Update table
+            document.getElementById('tblBaseline').textContent = BASELINE_YIELD.toFixed(2) + '%';
+            document.getElementById('tblUpper').textContent = upperTrigger.toFixed(2) + '%';
+            document.getElementById('tblLower').textContent = lowerTrigger.toFixed(2) + '%';
+            document.getElementById('tblCurrent').textContent = CURRENT_YIELD.toFixed(2) + '%';
+
+            const tblChange = document.getElementById('tblChange');
+            tblChange.textContent = (changeBp >= 0 ? '+' : '') + changeBp + 'bp';
+            tblChange.style.color = changeBp > 0 ? '#4ade80' : changeBp < 0 ? '#f87171' : '#fbbf24';
+
+            // Progress Chart
             const ctx = document.getElementById('progressChart').getContext('2d');
+            if (progressChartInstance) {
+                progressChartInstance.destroy();
+                progressChartInstance = null;
+            }
 
             const progressPercent = Math.min(100, (Math.abs(changeBp) / THRESHOLD_BP) * 100);
             const remainingPercent = 100 - progressPercent;
 
-            new Chart(ctx, {
+            progressChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: ['Progress to ±20bp Threshold'],
@@ -679,6 +718,47 @@
                     }
                 }
             });
+        }
+
+        async function fetchLiveYield() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000);
+            try {
+                const res = await fetch('/.netlify/functions/bond-yield', {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data || typeof data.currentYield !== 'number') throw new Error('Bad response');
+                CURRENT_YIELD = data.currentYield;
+
+                if (data.observationDate && /^\d{4}-\d{2}-\d{2}$/.test(data.observationDate)) {
+                    CURRENT_DATE_TEXT = formatMonthDayYear(data.observationDate);
+                } else {
+                    CURRENT_DATE_TEXT = 'Latest available';
+                }
+
+                const lastUpdatedEl = document.getElementById('lastUpdated');
+                if (lastUpdatedEl && data.lastUpdated) {
+                    lastUpdatedEl.textContent = data.lastUpdated;
+                }
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await fetchLiveYield();
+            } catch (e) {
+                console.warn('Live yield fetch failed; using fallback snapshot.', e);
+                CURRENT_DATE_TEXT = 'Latest available (stale)';
+                const lastUpdatedEl = document.getElementById('lastUpdated');
+                if (lastUpdatedEl) lastUpdatedEl.textContent = lastUpdatedEl.textContent + ' (stale)';
+            }
+
+            render();
         });
     </script>
 </body>

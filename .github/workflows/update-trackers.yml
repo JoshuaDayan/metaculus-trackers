@@ -1,8 +1,6 @@
 name: Update Metaculus Trackers
 
 on:
-  schedule:
-    - cron: '0 22 * * *'
   workflow_dispatch:
 
 jobs:
@@ -19,10 +17,5 @@ jobs:
         run: pip install requests beautifulsoup4 lxml
       - name: Run update script
         run: python scripts/update-data.py
-      - name: Commit and push if changed
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add -A
-          git diff --staged --quiet || git commit -m "Auto-update tracker data"
-          git push
+      - name: Note
+        run: echo "Trackers now fetch live data via Netlify Functions; this workflow no longer commits changes."
