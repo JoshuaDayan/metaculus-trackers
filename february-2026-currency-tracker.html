@@ -355,7 +355,7 @@
             <h3>✅ 100% Yahoo Finance Data</h3>
             <p><strong>All values scraped directly from Yahoo Finance.</strong></p>
             <p><strong>Baseline:</strong> January 30, 2026 (Friday close — Jan 31 was Saturday)</p>
-            <p><strong>Last Updated:</strong> <span id="lastUpdated" style="color:#4ade80; font-weight: bold;">February 04, 2026 at 02:21 PM GMT</span></p>
+            <p><strong>Last Updated:</strong> <span id="lastUpdated" data-fallback="February 04, 2026 at 02:21 PM GMT" style="color:#4ade80; font-weight: bold;">Loading…</span></p>
         </div>
 
         <div class="status-bar">
@@ -709,7 +709,10 @@
             } catch (e) {
                 console.warn('Live FX fetch failed; using fallback snapshot.', e);
                 const lastUpdatedEl = document.getElementById('lastUpdated');
-                if (lastUpdatedEl) lastUpdatedEl.textContent = lastUpdatedEl.textContent + ' (stale)';
+                if (lastUpdatedEl) {
+                    const fallback = lastUpdatedEl.dataset.fallback;
+                    lastUpdatedEl.textContent = fallback ? `${fallback} (stale)` : 'Unavailable (stale)';
+                }
             }
 
             setDateLabels();
