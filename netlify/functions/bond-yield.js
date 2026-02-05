@@ -9,6 +9,28 @@ const MAX_SERIES_POINTS = 140;
 const DEFAULT_CDN_CACHE_SECONDS = 60 * 60; // 1 hour
 const DEFAULT_STALE_WHILE_REVALIDATE_SECONDS = 24 * 60 * 60; // 1 day
 
+function parseISODate(dateStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function isWeekday(date) {
+  const day = date.getUTCDay();
+  return day >= 1 && day <= 5;
+}
+
 function formatTimestampUtc(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -43,20 +65,13 @@ exports.handler = async () => {
 
     const keys = Object.keys(obs).map((k) => Number(k)).filter((n) => Number.isFinite(n));
     if (!keys.length) throw new Error("Bundesbank response has no observation keys");
-    const latestIndex = Math.max(...keys);
-
-    const rawYield = obs[String(latestIndex)]?.[0];
-    const currentYield = Math.round(Number(rawYield) * 100) / 100;
-    if (!Number.isFinite(currentYield)) throw new Error("Bundesbank current yield is not a number");
-
     const values = json?.data?.structure?.dimensions?.observation?.[0]?.values;
     const hasValues = Array.isArray(values);
 
-    const observationDate = hasValues && values[latestIndex] ? values[latestIndex].id || values[latestIndex].name || null : null;
-
     let series = null;
     let baselineYield = null;
-    let asOfDate = observationDate;
+    let asOfDate = null;
+    let currentYield = null;
 
     if (hasValues) {
       const sorted = keys.sort((a, b) => a - b);
@@ -66,9 +81,13 @@ exports.handler = async () => {
         if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
         if (date < BASELINE_DATE) continue;
 
+        const dateObj = parseISODate(date);
+        if (!dateObj || !isWeekday(dateObj)) continue;
+
         const raw = obs[String(idx)]?.[0];
         const y = Math.round(Number(raw) * 100) / 100;
         if (!Number.isFinite(y)) continue;
+        if (y === 0) continue; // Bundesbank includes 0.00 on non-trading days (e.g. weekends)
 
         out.push({ date, yield: y });
       }
@@ -84,7 +103,29 @@ exports.handler = async () => {
 
       if (series.length) {
         asOfDate = series[series.length - 1].date;
+        currentYield = series[series.length - 1].yield;
       }
+    }
+
+    if (currentYield === null) {
+      // Fallback: find latest non-zero weekday observation (handles weekend lookups).
+      const sortedDesc = keys.sort((a, b) => b - a);
+      for (const idx of sortedDesc) {
+        const date = hasValues && values[idx] ? values[idx].id || values[idx].name || null : null;
+        if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        const dateObj = parseISODate(date);
+        if (!dateObj || !isWeekday(dateObj)) continue;
+        const raw = obs[String(idx)]?.[0];
+        const y = Math.round(Number(raw) * 100) / 100;
+        if (!Number.isFinite(y) || y === 0) continue;
+        currentYield = y;
+        asOfDate = date;
+        break;
+      }
+    }
+
+    if (currentYield === null || asOfDate === null) {
+      throw new Error("Bundesbank current yield is not available");
     }
 
     const body = {
