@@ -235,7 +235,7 @@
         }
 
         .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
-        .chart-wrapper { position: relative; height: 200px; }
+        .chart-wrapper { position: relative; height: 260px; }
 
         /* Gauge */
         .gauge {
@@ -476,10 +476,10 @@
             <div class="gauge-center-label" id="gaugeLabel">Currently at baseline</div>
         </div>
 
-        <div class="chart-container">
-            <h3 class="chart-title">📊 Progress to Threshold</h3>
+        <div class="chart-container" id="yieldChartContainer">
+            <h3 class="chart-title">📈 Yield Over Time</h3>
             <div class="chart-wrapper">
-                <canvas id="progressChart"></canvas>
+                <canvas id="yieldChart"></canvas>
             </div>
         </div>
 
@@ -549,9 +549,10 @@
         // "Daily yield of the current 10 year federal bond"
         // ===========================================
 
-        const BASELINE_YIELD = 2.85;  // Jan 30, 2026 (Bundesbank)
+        let BASELINE_YIELD = 2.85;  // Jan 30, 2026 (Bundesbank)
         let CURRENT_YIELD = 2.88;     // fallback only; live fetch will overwrite
         const THRESHOLD_BP = 20;      // ±20 basis points
+        let LIVE_SERIES = null;
 
         let CURRENT_DATE_TEXT = 'Latest available';
         const BASELINE_DATE_TEXT = 'January 30, 2026';
@@ -570,6 +571,12 @@
             return d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric', timeZone: 'UTC' });
         }
 
+        function formatMonthDay(dateStr) {
+            const d = parseISODate(dateStr);
+            if (!d) return dateStr;
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+        }
+
         function setDateLabels() {
             const baselineEl = document.getElementById('baselineDateLabel');
             const currentEl = document.getElementById('currentDateLabel');
@@ -584,7 +591,124 @@
             if (currentTableEl) currentTableEl.textContent = CURRENT_DATE_TEXT;
         }
 
-        let progressChartInstance = null;
+        let yieldChartInstance = null;
+
+        function renderYieldChart(upperTrigger, lowerTrigger) {
+            const container = document.getElementById('yieldChartContainer');
+            const canvas = document.getElementById('yieldChart');
+            if (!container || !canvas) return;
+
+            if (!LIVE_SERIES || !Array.isArray(LIVE_SERIES) || LIVE_SERIES.length < 2) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = '';
+
+            const points = LIVE_SERIES.filter((p) => {
+                return (
+                    p &&
+                    typeof p.date === 'string' &&
+                    /^\d{4}-\d{2}-\d{2}$/.test(p.date) &&
+                    typeof p.yield === 'number' &&
+                    Number.isFinite(p.yield)
+                );
+            });
+            if (points.length < 2) {
+                container.style.display = 'none';
+                return;
+            }
+
+            const labels = points.map((p) => formatMonthDay(p.date));
+            const yields = points.map((p) => p.yield);
+
+            const baselineLine = yields.map(() => BASELINE_YIELD);
+            const upperLine = yields.map(() => upperTrigger);
+            const lowerLine = yields.map(() => lowerTrigger);
+
+            const allY = yields.concat([BASELINE_YIELD, upperTrigger, lowerTrigger]);
+            const minY = Math.min(...allY);
+            const maxY = Math.max(...allY);
+            const pad = Math.max(0.05, (maxY - minY) * 0.12);
+
+            const ctx = canvas.getContext('2d');
+            if (yieldChartInstance) {
+                yieldChartInstance.destroy();
+                yieldChartInstance = null;
+            }
+
+            yieldChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Bund 10Y yield',
+                            data: yields,
+                            borderColor: '#00d4ff',
+                            backgroundColor: 'rgba(0, 212, 255, 0.12)',
+                            borderWidth: 2.5,
+                            pointRadius: (ctx) => (ctx.dataIndex === yields.length - 1 ? 3 : 0),
+                            pointHoverRadius: 5,
+                            tension: 0.25,
+                            fill: true
+                        },
+                        {
+                            label: 'Baseline',
+                            data: baselineLine,
+                            borderColor: '#fbbf24',
+                            borderWidth: 1.5,
+                            borderDash: [6, 6],
+                            pointRadius: 0
+                        },
+                        {
+                            label: '+20bp trigger',
+                            data: upperLine,
+                            borderColor: '#4ade80',
+                            borderWidth: 1.25,
+                            borderDash: [4, 4],
+                            pointRadius: 0
+                        },
+                        {
+                            label: '-20bp trigger',
+                            data: lowerLine,
+                            borderColor: '#4ade80',
+                            borderWidth: 1.25,
+                            borderDash: [4, 4],
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            suggestedMin: minY - pad,
+                            suggestedMax: maxY + pad,
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: (v) => v.toFixed(2) + '%' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', maxRotation: 0, autoSkip: true }
+                        }
+                    }
+                }
+            });
+        }
 
         function render() {
             // Calculate values
@@ -653,71 +777,7 @@
             tblChange.textContent = (changeBp >= 0 ? '+' : '') + changeBp + 'bp';
             tblChange.style.color = changeBp > 0 ? '#4ade80' : changeBp < 0 ? '#f87171' : '#fbbf24';
 
-            // Progress Chart
-            const ctx = document.getElementById('progressChart').getContext('2d');
-            if (progressChartInstance) {
-                progressChartInstance.destroy();
-                progressChartInstance = null;
-            }
-
-            const progressPercent = Math.min(100, (Math.abs(changeBp) / THRESHOLD_BP) * 100);
-            const remainingPercent = 100 - progressPercent;
-
-            progressChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Progress to ±20bp Threshold'],
-                    datasets: [
-                        {
-                            label: 'Current Change',
-                            data: [progressPercent],
-                            backgroundColor: changeBp >= 0 ? 'rgba(74, 222, 128, 0.8)' : 'rgba(248, 113, 113, 0.8)',
-                            borderColor: changeBp >= 0 ? '#4ade80' : '#f87171',
-                            borderWidth: 2,
-                            borderRadius: 8
-                        },
-                        {
-                            label: 'Remaining',
-                            data: [remainingPercent],
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                            borderColor: 'rgba(255, 255, 255, 0.2)',
-                            borderWidth: 1,
-                            borderRadius: 8
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: ctx => {
-                                    if (ctx.datasetIndex === 0) {
-                                        return `Current: ${Math.abs(changeBp)}bp (${progressPercent.toFixed(1)}% of threshold)`;
-                                    }
-                                    return `Remaining: ${distanceToThreshold}bp (${remainingPercent.toFixed(1)}%)`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            stacked: true,
-                            max: 100,
-                            grid: { color: 'rgba(255,255,255,0.08)' },
-                            ticks: { color: '#888', callback: v => v + '%' }
-                        },
-                        y: {
-                            stacked: true,
-                            grid: { display: false },
-                            ticks: { display: false }
-                        }
-                    }
-                }
-            });
+            renderYieldChart(upperTrigger, lowerTrigger);
         }
 
         async function fetchLiveYield() {
@@ -733,8 +793,15 @@
                 if (!data || typeof data.currentYield !== 'number') throw new Error('Bad response');
                 CURRENT_YIELD = data.currentYield;
 
-                if (data.observationDate && /^\d{4}-\d{2}-\d{2}$/.test(data.observationDate)) {
-                    CURRENT_DATE_TEXT = formatMonthDayYear(data.observationDate);
+                if (typeof data.baselineYield === 'number' && Number.isFinite(data.baselineYield)) {
+                    BASELINE_YIELD = data.baselineYield;
+                }
+
+                LIVE_SERIES = Array.isArray(data.series) ? data.series : null;
+
+                const asOf = data.asOfDate || data.observationDate;
+                if (asOf && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+                    CURRENT_DATE_TEXT = formatMonthDayYear(asOf);
                 } else {
                     CURRENT_DATE_TEXT = 'Latest available';
                 }
