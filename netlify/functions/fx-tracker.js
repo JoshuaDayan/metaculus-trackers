@@ -196,7 +196,8 @@ exports.handler = async (event) => {
       candidates = candidates ? intersection(candidates, set) : set;
     }
 
-    const asOfDate = candidates && candidates.size ? Array.from(candidates).sort().at(-1) : BASELINE_DATE;
+    const commonDates = candidates && candidates.size ? Array.from(candidates).sort() : [];
+    const asOfDate = commonDates.length ? commonDates.at(-1) : BASELINE_DATE;
 
     const current = {};
     const pct = {};
@@ -220,6 +221,24 @@ exports.handler = async (event) => {
     }
     standings.sort((a, b) => b.pctChange - a.pctChange);
 
+    const seriesDates = [BASELINE_DATE, ...commonDates];
+    const series = {
+      dates: seriesDates,
+      close: {},
+      pct: {},
+    };
+    for (const code of Object.keys(TICKERS)) {
+      const base = baseline[code];
+      const closeArr = seriesDates.map((d) => seriesByCode[code].closeByDate[d] ?? null);
+      const pctArr = closeArr.map((v, idx) => {
+        if (v === null || v === undefined) return null;
+        if (idx === 0) return 0;
+        return ((v - base) / base) * 100;
+      });
+      series.close[code] = closeArr;
+      series.pct[code] = pctArr;
+    }
+
     const body = {
       month: MONTH,
       baselineDate: BASELINE_DATE,
@@ -229,6 +248,7 @@ exports.handler = async (event) => {
       baseline,
       current,
       pct,
+      series,
       leader: standings[0] ? { code: standings[0].code, pctChange: standings[0].pctChange } : null,
       tickers: TICKERS,
       standings,
@@ -262,4 +282,3 @@ exports.handler = async (event) => {
     };
   }
 };
-

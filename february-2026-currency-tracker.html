@@ -243,6 +243,7 @@
         }
 
         .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
+        .chart-note { color: #888; font-size: 0.85rem; margin-top: -12px; margin-bottom: 14px; }
         .chart-wrapper { position: relative; height: 320px; }
 
         .data-table {
@@ -355,7 +356,7 @@
             <h3>✅ 100% Yahoo Finance Data</h3>
             <p><strong>All values scraped directly from Yahoo Finance.</strong></p>
             <p><strong>Baseline:</strong> January 30, 2026 (Friday close — Jan 31 was Saturday)</p>
-            <p><strong>Last Updated:</strong> <span id="lastUpdated" style="color:#4ade80; font-weight: bold;">February 04, 2026 at 02:21 PM GMT</span></p>
+            <p><strong>Last Updated:</strong> <span id="lastUpdated" data-fallback="February 04, 2026 at 02:21 PM GMT" style="color:#4ade80; font-weight: bold;">Loading…</span></p>
         </div>
 
         <div class="status-bar">
@@ -383,6 +384,14 @@
             <h3 class="chart-title">📊 February 2026 Performance Ranking (% Change from Baseline)</h3>
             <div class="chart-wrapper">
                 <canvas id="barChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container" id="performanceChartContainer">
+            <h3 class="chart-title">📈 Daily Performance (% Change vs Baseline Close)</h3>
+            <p class="chart-note" id="performanceChartNote"></p>
+            <div class="chart-wrapper">
+                <canvas id="performanceChart"></canvas>
             </div>
         </div>
 
@@ -498,6 +507,17 @@
             const sign = n >= 0 ? '+' : '';
             return `${sign}${n.toFixed(4)}%`;
         }
+
+        const LINE_COLORS = {
+            EUR: '#60a5fa', // blue
+            GBP: '#a78bfa', // purple
+            JPY: '#fbbf24', // gold
+            CNY: '#f87171', // red
+            CHF: '#34d399', // green
+            AUD: '#fb7185', // pink
+            CAD: '#22d3ee', // cyan
+            MXN: '#fb923c'  // orange
+        };
 
         function parseISODate(dateStr) {
             const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
@@ -676,6 +696,97 @@
             });
         }
 
+        let performanceChartInstance = null;
+        let LIVE_SERIES = null;
+
+        function renderPerformanceChart(results) {
+            const container = document.getElementById('performanceChartContainer');
+            const noteEl = document.getElementById('performanceChartNote');
+            if (!container) return;
+
+            if (!LIVE_SERIES || !Array.isArray(LIVE_SERIES.dates) || !LIVE_SERIES.pct) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = '';
+
+            const top3 = results.slice(0, 3).map(r => r.code);
+            const medalFor = (code) => {
+                if (top3[0] === code) return '🥇 ';
+                if (top3[1] === code) return '🥈 ';
+                if (top3[2] === code) return '🥉 ';
+                return '';
+            };
+
+            const labels = LIVE_SERIES.dates.map(formatMonthDay);
+
+            const datasets = Object.keys(CURRENCIES).map(code => {
+                const isTop = top3.includes(code);
+                const series = LIVE_SERIES.pct[code] || [];
+                return {
+                    label: medalFor(code) + code,
+                    data: series,
+                    borderColor: LINE_COLORS[code] || '#e5e7eb',
+                    backgroundColor: (LINE_COLORS[code] || '#e5e7eb') + '22',
+                    borderWidth: isTop ? 3 : 1.5,
+                    pointRadius: isTop ? 2 : 0,
+                    pointHoverRadius: 4,
+                    tension: 0.25,
+                    spanGaps: false
+                };
+            });
+
+            const canvas = document.getElementById('performanceChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            if (performanceChartInstance) {
+                performanceChartInstance.destroy();
+                performanceChartInstance = null;
+            }
+
+            if (noteEl) {
+                noteEl.textContent = `Daily Close values from Yahoo Finance • Top 3 highlighted (${top3.join(', ')})`;
+            }
+
+            performanceChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                color: '#bbb',
+                                usePointStyle: true,
+                                boxWidth: 10,
+                                padding: 14
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: v => v.toFixed(2) + '%' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', maxRotation: 0, autoSkip: true }
+                        }
+                    }
+                }
+            });
+        }
+
         async function fetchLiveData() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -692,6 +803,7 @@
                 CURRENT = data.current;
                 if (data.baselineDate) BASELINE_DATE = data.baselineDate;
                 if (data.asOfDate) ASOF_DATE = data.asOfDate;
+                LIVE_SERIES = data.series || null;
 
                 const lastUpdatedEl = document.getElementById('lastUpdated');
                 if (lastUpdatedEl && data.lastUpdated) {
@@ -709,7 +821,10 @@
             } catch (e) {
                 console.warn('Live FX fetch failed; using fallback snapshot.', e);
                 const lastUpdatedEl = document.getElementById('lastUpdated');
-                if (lastUpdatedEl) lastUpdatedEl.textContent = lastUpdatedEl.textContent + ' (stale)';
+                if (lastUpdatedEl) {
+                    const fallback = lastUpdatedEl.dataset.fallback;
+                    lastUpdatedEl.textContent = fallback ? `${fallback} (stale)` : 'Unavailable (stale)';
+                }
             }
 
             setDateLabels();
@@ -718,6 +833,7 @@
             renderCards(results);
             renderTable(results);
             renderChart(results);
+            renderPerformanceChart(results);
         });
     </script>
 </body>

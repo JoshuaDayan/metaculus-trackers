@@ -3,6 +3,8 @@
 const SERIES_ID = "BBSSY.D.REN.EUR.A630.000000WT1010.A";
 const URL =
   "https://api.statistiken.bundesbank.de/rest/data/BBSSY/D.REN.EUR.A630.000000WT1010.A";
+const BASELINE_DATE = "2026-01-30";
+const MAX_SERIES_POINTS = 140;
 
 const DEFAULT_CDN_CACHE_SECONDS = 60 * 60; // 1 hour
 const DEFAULT_STALE_WHILE_REVALIDATE_SECONDS = 24 * 60 * 60; // 1 day
@@ -47,22 +49,53 @@ exports.handler = async () => {
     const currentYield = Math.round(Number(rawYield) * 100) / 100;
     if (!Number.isFinite(currentYield)) throw new Error("Bundesbank current yield is not a number");
 
-    let observationDate = null;
-    try {
-      const values = json?.data?.structure?.dimensions?.observation?.[0]?.values;
-      if (Array.isArray(values) && values[latestIndex]) {
-        observationDate = values[latestIndex].id || values[latestIndex].name || null;
+    const values = json?.data?.structure?.dimensions?.observation?.[0]?.values;
+    const hasValues = Array.isArray(values);
+
+    const observationDate = hasValues && values[latestIndex] ? values[latestIndex].id || values[latestIndex].name || null : null;
+
+    let series = null;
+    let baselineYield = null;
+    let asOfDate = observationDate;
+
+    if (hasValues) {
+      const sorted = keys.sort((a, b) => a - b);
+      const out = [];
+      for (const idx of sorted) {
+        const date = values[idx]?.id || values[idx]?.name || null;
+        if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        if (date < BASELINE_DATE) continue;
+
+        const raw = obs[String(idx)]?.[0];
+        const y = Math.round(Number(raw) * 100) / 100;
+        if (!Number.isFinite(y)) continue;
+
+        out.push({ date, yield: y });
       }
-    } catch {
-      // optional
+
+      const baselinePoint = out.find((p) => p.date === BASELINE_DATE);
+      if (baselinePoint) baselineYield = baselinePoint.yield;
+
+      if (out.length > MAX_SERIES_POINTS) {
+        series = out.slice(-MAX_SERIES_POINTS);
+      } else {
+        series = out;
+      }
+
+      if (series.length) {
+        asOfDate = series[series.length - 1].date;
+      }
     }
 
     const body = {
-      series: SERIES_ID,
+      seriesId: SERIES_ID,
+      baselineDate: BASELINE_DATE,
+      baselineYield,
       fetchedAt,
       lastUpdated: formatTimestampUtc(fetchedAt),
-      observationDate,
+      asOfDate,
       currentYield,
+      series,
       source: {
         provider: "Deutsche Bundesbank",
         url: URL,
@@ -92,4 +125,3 @@ exports.handler = async () => {
     };
   }
 };
-
