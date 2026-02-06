@@ -226,6 +226,57 @@
         .change-value.neutral { color: #fbbf24; }
         .change-unit { font-size: 0.85rem; color: #888; margin-top: 5px; }
 
+        .month-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 340px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .month-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+        }
+
+        .month-label { font-size: 0.9rem; color: #ddd; }
+
+        .month-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.12);
+            color: #bbb;
+            background: rgba(255,255,255,0.06);
+        }
+
+        .month-badge.yes {
+            color: #4ade80;
+            background: rgba(74, 222, 128, 0.14);
+            border-color: rgba(74, 222, 128, 0.35);
+        }
+
+        .month-badge.no {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.12);
+            border-color: rgba(248, 113, 113, 0.32);
+        }
+
+        .month-badge.unknown {
+            color: #fbbf24;
+            background: rgba(251, 191, 36, 0.10);
+            border-color: rgba(251, 191, 36, 0.30);
+        }
+
         .chart-container {
             background: rgba(255,255,255,0.04);
             border-radius: 16px;
@@ -503,6 +554,19 @@
                     <div class="change-unit">from baseline</div>
                 </div>
             </div>
+
+            <div class="data-card" id="monthlyHistoryCard">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">🗓️ Monthly Threshold History</div>
+                        <div class="card-subtitle">2025–Jan 2026 • Would the month have breached ±20bp?</div>
+                    </div>
+                </div>
+                <div id="monthlyFlags" class="month-list">
+                    <div class="card-subtitle">Loading…</div>
+                </div>
+                <div class="card-subtitle" id="monthlyFlagsNote"></div>
+            </div>
         </div>
 
         <div class="chart-container">
@@ -606,6 +670,7 @@
         const THRESHOLD_BP = 20;      // ±20 basis points
         let LIVE_SERIES = null;
         let COMPARISON_DATA = null;
+        let MONTHLY_FLAGS_DATA = null;
 
         let CURRENT_DATE_TEXT = 'Latest available';
         const BASELINE_DATE_TEXT = 'January 30, 2026';
@@ -628,6 +693,14 @@
             const d = parseISODate(dateStr);
             if (!d) return dateStr;
             return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+        }
+
+        function formatMonthShortYear(monthStr) {
+            const m = /^(\d{4})-(\d{2})$/.exec(monthStr);
+            if (!m) return monthStr;
+            const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1));
+            if (Number.isNaN(d.getTime())) return monthStr;
+            return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
         }
 
         function csvEscape(value) {
@@ -861,10 +934,13 @@
                 comparisonChartInstance = null;
             }
 
+            if (missingCodes.length) {
+                console.warn('Yield comparison: some series unavailable', missingCodes);
+            }
+
             if (noteEl) {
                 const asOf = COMPARISON_DATA?.asOfDate ? formatMonthDayYear(COMPARISON_DATA.asOfDate) : 'latest available';
-                const missingText = missingCodes.length ? ` • Missing: ${missingCodes.join(', ')}` : '';
-                noteEl.textContent = `1-year daily yields • Germany: Bundesbank • Others: FRED • Germany bolded • As of ${asOf}${missingText}`;
+                noteEl.textContent = `1-year daily yields • Germany: Bundesbank • Others: FRED • Germany bolded • As of ${asOf}`;
             }
 
             comparisonChartInstance = new Chart(ctx, {
@@ -917,6 +993,82 @@
                 if (btn) btn.disabled = false;
             } finally {
                 clearTimeout(timeoutId);
+            }
+        }
+
+        async function fetchMonthlyFlags() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 9000);
+            try {
+                const res = await fetch('/.netlify/functions/bond-monthly-flags', {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data || !Array.isArray(data.months)) throw new Error('Bad response');
+                MONTHLY_FLAGS_DATA = data;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        function renderMonthlyFlags() {
+            const container = document.getElementById('monthlyFlags');
+            const noteEl = document.getElementById('monthlyFlagsNote');
+            if (!container) return;
+
+            if (!MONTHLY_FLAGS_DATA || !Array.isArray(MONTHLY_FLAGS_DATA.months)) {
+                container.innerHTML = '<div class="card-subtitle">Unavailable</div>';
+                if (noteEl) noteEl.textContent = '';
+                return;
+            }
+
+            container.innerHTML = '';
+            for (const m of MONTHLY_FLAGS_DATA.months) {
+                const monthStr = typeof m.month === 'string' ? m.month : '';
+                const labelText = formatMonthShortYear(monthStr);
+                const statusRaw = typeof m.status === 'string' ? m.status : '';
+                const status = statusRaw === 'YES' ? 'YES' : statusRaw === 'NO' ? 'NO' : '—';
+                const badgeClass = status === 'YES' ? 'yes' : status === 'NO' ? 'no' : 'unknown';
+
+                const row = document.createElement('div');
+                row.className = 'month-row';
+
+                const label = document.createElement('div');
+                label.className = 'month-label';
+                label.textContent = labelText;
+
+                const badge = document.createElement('div');
+                badge.className = `month-badge ${badgeClass}`;
+                badge.textContent = status;
+
+                if (status !== '—' && typeof m.baselineDate === 'string') {
+                    const baselineYield = typeof m.baselineYield === 'number' ? m.baselineYield : null;
+                    const minYield = typeof m.minYield === 'number' ? m.minYield : null;
+                    const maxYield = typeof m.maxYield === 'number' ? m.maxYield : null;
+                    const upper = typeof m.upperTrigger === 'number' ? m.upperTrigger : null;
+                    const lower = typeof m.lowerTrigger === 'number' ? m.lowerTrigger : null;
+                    const breach = typeof m.breach === 'string' ? m.breach : '';
+
+                    const parts = [
+                        `${labelText}`,
+                        `Baseline ${m.baselineDate}${baselineYield !== null ? ` (${baselineYield.toFixed(2)}%)` : ''}`,
+                        upper !== null && lower !== null ? `Triggers ${lower.toFixed(2)}% / ${upper.toFixed(2)}%` : null,
+                        minYield !== null && maxYield !== null ? `Min/Max ${minYield.toFixed(2)}% / ${maxYield.toFixed(2)}%` : null,
+                        breach ? `Breach: ${breach}` : null
+                    ].filter(Boolean);
+                    row.title = parts.join(' • ');
+                }
+
+                row.appendChild(label);
+                row.appendChild(badge);
+                container.appendChild(row);
+            }
+
+            if (noteEl) {
+                const updated = MONTHLY_FLAGS_DATA.lastUpdated || '';
+                noteEl.textContent = `Baseline = last trading day of prior month • YES if any day breached ±20bp${updated ? ` • Updated ${updated}` : ''}`;
             }
         }
 
@@ -1103,8 +1255,15 @@
                 if (noteEl) noteEl.textContent = 'Comparison data unavailable (stale).';
             }
 
+            try {
+                await fetchMonthlyFlags();
+            } catch (e) {
+                console.warn('Monthly history fetch failed; showing placeholder.', e);
+            }
+
             render();
             renderComparisonChart();
+            renderMonthlyFlags();
         });
     </script>
 </body>

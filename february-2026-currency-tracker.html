@@ -273,6 +273,33 @@
         .change-percent.negative { color: #f87171; }
         .change-percent.neutral { color: #fbbf24; }
 
+        .month-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 360px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .month-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+        }
+
+        .month-label { font-size: 0.9rem; color: #ddd; }
+        .winner-cell { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #ddd; }
+        .winner-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .winner-pct.positive { color: #4ade80; }
+        .winner-pct.negative { color: #f87171; }
+        .winner-pct.neutral { color: #fbbf24; }
+
         .chart-container {
             background: rgba(255,255,255,0.04);
             border-radius: 16px;
@@ -447,6 +474,12 @@
             </div>
         </div>
 
+        <div class="chart-container" id="monthlyWinnersContainer">
+            <h3 class="chart-title">🗓️ Monthly FX Winners (2025–Jan 2026)</h3>
+            <p class="chart-note" id="monthlyWinnersNote">Loading…</p>
+            <div id="monthlyWinnersList" class="month-list"></div>
+        </div>
+
         <div class="chart-container">
             <h3 class="chart-title">📋 Complete Data Table</h3>
             <table class="data-table" id="dataTable">
@@ -589,6 +622,14 @@
             const d = parseISODate(dateStr);
             if (!d) return dateStr;
             return d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric', timeZone: 'UTC' });
+        }
+
+        function formatMonthShortYear(monthStr) {
+            const m = /^(\d{4})-(\d{2})$/.exec(monthStr);
+            if (!m) return monthStr;
+            const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1));
+            if (Number.isNaN(d.getTime())) return monthStr;
+            return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
         }
 
         function setDateLabels() {
@@ -755,6 +796,7 @@
         let HISTORY_SERIES = null;
         let HISTORY_BASELINE_DATE = null;
         let HISTORY_ASOF_DATE = null;
+        let MONTHLY_WINNERS_DATA = null;
 
         function csvEscape(value) {
             const s = String(value ?? '');
@@ -1114,6 +1156,88 @@
             });
         }
 
+        async function fetchMonthlyWinners() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 7000);
+            try {
+                const res = await fetch('/.netlify/functions/fx-monthly-winners', {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data || !Array.isArray(data.months)) throw new Error('Bad response');
+                MONTHLY_WINNERS_DATA = data;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        function renderMonthlyWinners() {
+            const container = document.getElementById('monthlyWinnersContainer');
+            const noteEl = document.getElementById('monthlyWinnersNote');
+            const listEl = document.getElementById('monthlyWinnersList');
+            if (!container || !noteEl || !listEl) return;
+
+            if (!MONTHLY_WINNERS_DATA || !Array.isArray(MONTHLY_WINNERS_DATA.months)) {
+                noteEl.textContent = 'Monthly winners unavailable (stale).';
+                listEl.innerHTML = '';
+                return;
+            }
+
+            const updated = MONTHLY_WINNERS_DATA.lastUpdated || '';
+            noteEl.textContent =
+                `Baseline = last common weekday close of prior month • Winner = max % change vs USD` +
+                (updated ? ` • Updated ${updated}` : '');
+
+            listEl.innerHTML = '';
+            for (const m of MONTHLY_WINNERS_DATA.months) {
+                const monthStr = typeof m.month === 'string' ? m.month : '';
+                const monthLabel = formatMonthShortYear(monthStr);
+                const winnerCode = m?.winner?.code;
+                const winnerPct = typeof m?.winner?.pctChange === 'number' ? m.winner.pctChange : null;
+
+                const row = document.createElement('div');
+                row.className = 'month-row';
+
+                const left = document.createElement('div');
+                left.className = 'month-label';
+                left.textContent = monthLabel;
+
+                const right = document.createElement('div');
+                right.className = 'winner-cell';
+
+                if (winnerCode && Number.isFinite(winnerPct) && CURRENCIES[winnerCode]) {
+                    const dot = document.createElement('span');
+                    dot.className = 'winner-dot';
+                    dot.style.background = LINE_COLORS[winnerCode] || 'rgba(229, 231, 235, 0.7)';
+
+                    const label = document.createElement('span');
+                    label.textContent = `${CURRENCIES[winnerCode].flag} ${winnerCode}`;
+
+                    const pct = document.createElement('span');
+                    const cls = Math.abs(winnerPct) < 0.0001 ? 'neutral' : winnerPct >= 0 ? 'positive' : 'negative';
+                    pct.className = `winner-pct ${cls}`;
+                    const sign = winnerPct >= 0 ? '+' : '';
+                    pct.textContent = `${sign}${winnerPct.toFixed(2)}%`;
+
+                    right.appendChild(dot);
+                    right.appendChild(label);
+                    right.appendChild(pct);
+
+                    if (typeof m.baselineDate === 'string' && typeof m.asOfDate === 'string') {
+                        row.title = `${monthLabel} • ${m.baselineDate} → ${m.asOfDate} • Winner ${winnerCode} (${sign}${winnerPct.toFixed(4)}%)`;
+                    }
+                } else {
+                    right.textContent = '—';
+                }
+
+                row.appendChild(left);
+                row.appendChild(right);
+                listEl.appendChild(row);
+            }
+        }
+
         async function fetchLiveData() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -1145,7 +1269,7 @@
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             try {
-                const res = await fetch('/.netlify/functions/fx-history', {
+                const res = await fetch('/.netlify/functions/fx-history?noRound=1', {
                     headers: { 'Accept': 'application/json' },
                     signal: controller.signal
                 });
@@ -1209,6 +1333,12 @@
                 if (container) container.style.display = 'none';
             }
 
+            try {
+                await fetchMonthlyWinners();
+            } catch (e) {
+                console.warn('Monthly winners fetch failed; showing placeholder.', e);
+            }
+
             setDateLabels();
             const results = calculateResults();
             renderLeader(results);
@@ -1217,6 +1347,7 @@
             renderChart(results);
             renderPerformanceChart(results);
             renderDxyChart();
+            renderMonthlyWinners();
 
             if (febBtn && LIVE_SERIES) febBtn.disabled = false;
         });
