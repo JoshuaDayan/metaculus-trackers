@@ -43,8 +43,15 @@ function makeBundesbankFixture() {
   };
 }
 
-function makeFredCsv(seriesId) {
-  return `DATE,${seriesId}\n2026-02-02,4.10\n2026-02-03,4.12\n2026-02-04,4.11\n2026-02-05,4.09\n`;
+function makeFredCsvMulti(seriesIds) {
+  return [
+    ["DATE", ...seriesIds].join(","),
+    ["2026-02-02", ...seriesIds.map(() => "4.10")].join(","),
+    ["2026-02-03", ...seriesIds.map(() => "4.12")].join(","),
+    ["2026-02-04", ...seriesIds.map(() => "4.11")].join(","),
+    ["2026-02-05", ...seriesIds.map(() => "4.09")].join(","),
+    "",
+  ].join("\n");
 }
 
 test("bond-yields-1y returns DE from Bundesbank and others from FRED", async () => {
@@ -65,10 +72,12 @@ test("bond-yields-1y returns DE from Bundesbank and others from FRED", async () 
       }
       if (u.startsWith("https://fred.stlouisfed.org/graph/fredgraph.csv?")) {
         const parsed = new URL(u);
-        const id = parsed.searchParams.get("id");
-        assert.ok(id, "missing FRED id param");
-        assert.ok(fredSeries.has(id), `unexpected FRED series id: ${id}`);
-        return { ok: true, status: 200, statusText: "OK", text: async () => makeFredCsv(id) };
+        const idParam = parsed.searchParams.get("id");
+        assert.ok(idParam, "missing FRED id param");
+        const ids = idParam.split(",").filter(Boolean);
+        assert.ok(ids.length >= 2, "expected multiple FRED ids");
+        for (const id of ids) assert.ok(fredSeries.has(id), `unexpected FRED series id: ${id}`);
+        return { ok: true, status: 200, statusText: "OK", text: async () => makeFredCsvMulti(ids) };
       }
       throw new Error(`unexpected fetch url: ${u}`);
     };
@@ -96,4 +105,3 @@ test("bond-yields-1y returns DE from Bundesbank and others from FRED", async () 
     global.fetch = originalFetch;
   }
 });
-

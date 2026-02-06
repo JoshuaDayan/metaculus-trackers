@@ -751,6 +751,7 @@
         let performanceChartInstance = null;
         let LIVE_SERIES = null;
         let dxyChartInstance = null;
+        let dxyHoverIndex = null;
         let HISTORY_SERIES = null;
         let HISTORY_BASELINE_DATE = null;
         let HISTORY_ASOF_DATE = null;
@@ -776,42 +777,103 @@
 
         function buildSnapshotCsv(results) {
             const rows = [
-                ['Currency', 'Name', 'BaselineDate', 'AsOfDate', 'BaselineCloseUSD', 'AsOfCloseUSD', 'PctChange']
+                ['Rank', 'Code', 'Name', 'BaselineDate', 'BaselineCloseUSD', 'AsOfDate', 'AsOfCloseUSD', 'AbsChange', 'PctChange']
             ];
-            for (const r of results) {
+            for (let i = 0; i < results.length; i += 1) {
+                const r = results[i];
+                const absChange = (typeof r.current === 'number' && typeof r.baseline === 'number') ? (r.current - r.baseline) : '';
                 rows.push([
+                    i + 1,
                     r.code,
                     CURRENCIES[r.code]?.name || r.code,
                     BASELINE_DATE,
-                    ASOF_DATE,
                     r.baseline,
+                    ASOF_DATE,
                     r.current,
+                    absChange,
                     r.change
                 ]);
             }
             return rows;
         }
 
-        function buildWideSeriesCsv(series, codes, prefix) {
-            const rows = [];
-            const header = ['date'];
-            for (const code of codes) {
-                header.push(`${code}_${prefix}_close`);
-                header.push(`${code}_${prefix}_pct`);
-            }
-            rows.push(header);
+        function usdStrengthPctFromQuote(baseClose, close) {
+            const b = Number(baseClose);
+            const v = Number(close);
+            if (!Number.isFinite(b) || b === 0) return null;
+            if (!Number.isFinite(v) || v === 0) return null;
+            return ((b / v) - 1) * 100;
+        }
 
-            const dates = series?.dates || [];
-            for (let i = 0; i < dates.length; i += 1) {
-                const row = [dates[i]];
-                for (const code of codes) {
-                    const closeArr = series?.close?.[code] || [];
-                    const pctArr = series?.pct?.[code] || [];
-                    row.push(closeArr[i] ?? '');
-                    row.push(pctArr[i] ?? '');
-                }
-                rows.push(row);
+        function buildFebDailyCsvLong() {
+            const rows = [
+                ['Date', 'Code', 'Name', 'CloseUSD', 'QuotePctChange', 'UsdStrengthPctChange']
+            ];
+
+            const dates = LIVE_SERIES?.dates || [];
+            const codes = Object.keys(CURRENCIES);
+            const closeArrByCode = {};
+            const quotePctArrByCode = {};
+            const baseCloseByCode = {};
+            for (const code of codes) {
+                closeArrByCode[code] = LIVE_SERIES?.close?.[code] || [];
+                quotePctArrByCode[code] = LIVE_SERIES?.pct?.[code] || [];
+                baseCloseByCode[code] = closeArrByCode[code][0];
             }
+
+            for (let i = 0; i < dates.length; i += 1) {
+                const date = dates[i];
+                for (const code of codes) {
+                    const close = closeArrByCode[code][i];
+                    const quotePct = quotePctArrByCode[code][i];
+                    const usdPct = i === 0 ? 0 : usdStrengthPctFromQuote(baseCloseByCode[code], close);
+                    rows.push([
+                        date,
+                        code,
+                        CURRENCIES[code]?.name || code,
+                        close ?? '',
+                        quotePct ?? '',
+                        usdPct ?? ''
+                    ]);
+                }
+            }
+
+            return rows;
+        }
+
+        function buildHistoryCsvLong() {
+            const rows = [
+                ['Date', 'Series', 'Name', 'Close', 'QuotePctChange', 'UsdStrengthPctChange']
+            ];
+
+            const dates = HISTORY_SERIES?.dates || [];
+            const codes = ['DXY', ...Object.keys(CURRENCIES)];
+            const closeArrByCode = {};
+            const quotePctArrByCode = {};
+            const baseCloseByCode = {};
+            for (const code of codes) {
+                closeArrByCode[code] = HISTORY_SERIES?.close?.[code] || [];
+                quotePctArrByCode[code] = HISTORY_SERIES?.pct?.[code] || [];
+                baseCloseByCode[code] = closeArrByCode[code][0];
+            }
+
+            for (let i = 0; i < dates.length; i += 1) {
+                const date = dates[i];
+                for (const code of codes) {
+                    const close = closeArrByCode[code][i];
+                    const quotePct = quotePctArrByCode[code][i];
+                    const usdPct = code === 'DXY' ? quotePct : (i === 0 ? 0 : usdStrengthPctFromQuote(baseCloseByCode[code], close));
+                    rows.push([
+                        date,
+                        code,
+                        code === 'DXY' ? 'US Dollar Index (DXY)' : (CURRENCIES[code]?.name || code),
+                        close ?? '',
+                        quotePct ?? '',
+                        usdPct ?? ''
+                    ]);
+                }
+            }
+
             return rows;
         }
 
@@ -938,14 +1000,30 @@
                 fill: false
             });
 
-            const grey = 'rgba(229, 231, 235, 0.28)';
+            const baseGrey = 'rgba(229, 231, 235, 0.14)';
+            const dimGrey = 'rgba(229, 231, 235, 0.07)';
+            const highlightGrey = 'rgba(229, 231, 235, 0.85)';
+
+            const usdStrengthPctFor = (code) => {
+                const closeArr = HISTORY_SERIES.close?.[code] || [];
+                const base = Number(closeArr[0]);
+                if (!Number.isFinite(base) || base === 0) return closeArr.map(() => null);
+                return closeArr.map((v, idx) => {
+                    const value = Number(v);
+                    if (!Number.isFinite(value) || value === 0) return null;
+                    if (idx === 0) return 0;
+                    return ((base / value) - 1) * 100;
+                });
+            };
+
             for (const code of Object.keys(CURRENCIES)) {
-                const pct = HISTORY_SERIES.pct[code] || [];
+                // Convert USD-per-currency quotes into "USD strength" so direction matches DXY.
+                const pct = usdStrengthPctFor(code);
                 datasets.push({
                     label: `${CURRENCIES[code].name} (${code})`,
                     _code: code,
                     data: pct,
-                    borderColor: grey,
+                    borderColor: baseGrey,
                     backgroundColor: 'transparent',
                     borderWidth: 1,
                     pointRadius: 0,
@@ -964,7 +1042,7 @@
             if (noteEl) {
                 const base = HISTORY_BASELINE_DATE ? formatMonthDayYear(HISTORY_BASELINE_DATE) : '—';
                 const asof = HISTORY_ASOF_DATE ? formatMonthDayYear(HISTORY_ASOF_DATE) : '—';
-                noteEl.textContent = `All series show % change from ${base} • Bold line: DXY • Hover grey lines for currency details • As of ${asof}`;
+                noteEl.textContent = `All lines show USD strength (% change) from ${base} • Bold line: DXY • Hover grey lines for currency details • As of ${asof}`;
             }
 
             dxyChartInstance = new Chart(ctx, {
@@ -974,6 +1052,23 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     interaction: { mode: 'nearest', intersect: false },
+                    onHover: (event, active) => {
+                        if (!dxyChartInstance) return;
+                        const hovered = active && active.length ? active[0].datasetIndex : null;
+                        if (hovered === dxyHoverIndex) return;
+                        dxyHoverIndex = hovered;
+                        const ds = dxyChartInstance.data.datasets || [];
+                        for (let i = 0; i < ds.length; i += 1) {
+                            if (i === 0) continue; // DXY always bold/colorful
+                            ds[i].borderColor = baseGrey;
+                        }
+                        if (hovered !== null && hovered > 0) {
+                            for (let i = 1; i < ds.length; i += 1) {
+                                ds[i].borderColor = i === hovered ? highlightGrey : dimGrey;
+                            }
+                        }
+                        dxyChartInstance.update('none');
+                    },
                     plugins: {
                         legend: {
                             display: true,
@@ -993,9 +1088,14 @@
                                     const idx = ctx.dataIndex;
                                     const pct = ctx.parsed.y;
                                     const close = HISTORY_SERIES.close?.[code]?.[idx];
+                                    const quotePct = code !== 'DXY' ? (HISTORY_SERIES.pct?.[code]?.[idx]) : pct;
                                     const pctText = Number.isFinite(pct) ? `${pct.toFixed(2)}%` : '—';
                                     const closeText = formatCloseForCode(code, close);
-                                    return `${ctx.dataset.label}: ${pctText} (${closeText})`;
+                                    if (code === 'DXY') {
+                                        return `${ctx.dataset.label}: ${pctText} (${closeText})`;
+                                    }
+                                    const quoteText = Number.isFinite(quotePct) ? `${Number(quotePct).toFixed(2)}%` : '—';
+                                    return `${ctx.dataset.label}: ${pctText} (USD-per-currency quote: ${quoteText}, close: ${closeText})`;
                                 }
                             }
                         }
@@ -1078,8 +1178,7 @@
             if (febBtn) {
                 febBtn.addEventListener('click', () => {
                     if (!LIVE_SERIES) return;
-                    const codes = Object.keys(CURRENCIES);
-                    downloadCsv(`currency_feb2026_daily_${ASOF_DATE}.csv`, buildWideSeriesCsv(LIVE_SERIES, codes, 'feb'));
+                    downloadCsv(`currency_feb2026_daily_${ASOF_DATE}.csv`, buildFebDailyCsvLong());
                 });
             }
 
@@ -1087,8 +1186,7 @@
             if (histBtn) {
                 histBtn.addEventListener('click', () => {
                     if (!HISTORY_SERIES) return;
-                    const codes = ['DXY', ...Object.keys(CURRENCIES)];
-                    downloadCsv(`currency_1y_dxy_${HISTORY_ASOF_DATE || 'asof'}.csv`, buildWideSeriesCsv(HISTORY_SERIES, codes, '1y'));
+                    downloadCsv(`currency_1y_dxy_${HISTORY_ASOF_DATE || 'asof'}.csv`, buildHistoryCsvLong());
                 });
             }
 
