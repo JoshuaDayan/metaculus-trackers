@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Syntax check (functions)
+        run: |
+          node --check netlify/functions/fx-tracker.js
+          node --check netlify/functions/bond-yield.js
+          node --check netlify/functions/fx-history.js
+          node --check netlify/functions/bond-yields-1y.js
+
+      - name: Unit tests (mocked upstream)
+        run: |
+          node --test scripts/bond-yield.test.js scripts/fx-tracker.test.js scripts/fx-history.test.js scripts/bond-yields-1y.test.js

@@ -13,6 +13,13 @@ They fetch fresh data at runtime from same-origin endpoints:
 
 Responses are CDN-cached to keep costs low and avoid redeploying the site for routine data updates.
 
+## Rigorous checks (before pushing)
+
+This repo is a live data dashboard, so we run sanity checks before shipping:
+
+- Unit tests (mock upstream API shapes): `node --test scripts/bond-yield.test.js scripts/fx-tracker.test.js`
+- CI runs the same tests on PRs (see `.github/workflows/ci.yml`).
+
 ## Legacy GitHub Action
 
 This repo previously committed daily HTML updates via GitHub Actions. That workflow is now manual-only and does not push changes.

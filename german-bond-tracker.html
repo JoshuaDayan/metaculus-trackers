@@ -235,6 +235,7 @@
         }
 
         .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
+        .chart-note { color: #888; font-size: 0.85rem; margin-top: -12px; margin-bottom: 14px; }
         .chart-wrapper { position: relative; height: 260px; }
 
         /* Gauge */
@@ -332,6 +333,45 @@
             background: rgba(0, 212, 255, 0.1);
         }
 
+        .download-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .download-btn {
+            appearance: none;
+            border: 1px solid rgba(74, 222, 128, 0.4);
+            background: rgba(74, 222, 128, 0.10);
+            color: #4ade80;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .download-btn.secondary {
+            border-color: rgba(0, 212, 255, 0.4);
+            background: rgba(0, 212, 255, 0.08);
+            color: #00d4ff;
+        }
+
+        .download-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            background: rgba(74, 222, 128, 0.16);
+        }
+
+        .download-btn.secondary:hover:not(:disabled) {
+            background: rgba(0, 212, 255, 0.12);
+        }
+
+        .download-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
         .info-section {
             margin-top: 30px;
             padding: 25px;
@@ -386,6 +426,10 @@
             <p><strong>Time Series:</strong> BBSSY.D.REN.EUR.A630.000000WT1010.A (Daily yield of current 10yr federal bond)</p>
             <p><strong>Baseline:</strong> January 30, 2026 (Friday close)</p>
             <p><strong>Last Updated:</strong> <span id="lastUpdated" data-fallback="February 04, 2026 at 02:21 PM GMT" style="color:#4ade80; font-weight: bold;">Loading…</span></p>
+            <div class="download-row">
+                <button class="download-btn" id="downloadBundCsv" type="button" disabled>Download CSV (Bund)</button>
+                <button class="download-btn secondary" id="downloadComparisonCsv" type="button" disabled>Download CSV (1Y Comparison)</button>
+            </div>
         </div>
 
         <div class="status-bar">
@@ -483,6 +527,14 @@
             </div>
         </div>
 
+        <div class="chart-container" id="comparisonChartContainer">
+            <h3 class="chart-title">🌍 1-Year 10Y Yield Comparison</h3>
+            <p class="chart-note" id="comparisonChartNote"></p>
+            <div class="chart-wrapper">
+                <canvas id="comparisonChart"></canvas>
+            </div>
+        </div>
+
         <div class="chart-container">
             <h3 class="chart-title">📋 Threshold Calculations</h3>
             <table class="threshold-table">
@@ -553,6 +605,7 @@
         let CURRENT_YIELD = 2.88;     // fallback only; live fetch will overwrite
         const THRESHOLD_BP = 20;      // ±20 basis points
         let LIVE_SERIES = null;
+        let COMPARISON_DATA = null;
 
         let CURRENT_DATE_TEXT = 'Latest available';
         const BASELINE_DATE_TEXT = 'January 30, 2026';
@@ -577,6 +630,25 @@
             return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
         }
 
+        function csvEscape(value) {
+            const s = String(value ?? '');
+            if (/[\",\\n]/.test(s)) return '\"' + s.replace(/\"/g, '\"\"') + '\"';
+            return s;
+        }
+
+        function downloadCsv(filename, rows) {
+            const csv = rows.map(r => r.map(csvEscape).join(',')).join('\\n') + '\\n';
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
         function setDateLabels() {
             const baselineEl = document.getElementById('baselineDateLabel');
             const currentEl = document.getElementById('currentDateLabel');
@@ -592,6 +664,7 @@
         }
 
         let yieldChartInstance = null;
+        let comparisonChartInstance = null;
 
         function renderYieldChart(upperTrigger, lowerTrigger) {
             const container = document.getElementById('yieldChartContainer');
@@ -710,6 +783,171 @@
             });
         }
 
+        function renderComparisonChart() {
+            const container = document.getElementById('comparisonChartContainer');
+            const canvas = document.getElementById('comparisonChart');
+            const noteEl = document.getElementById('comparisonChartNote');
+            if (!container || !canvas) return;
+
+            const seriesObj = COMPARISON_DATA?.series;
+            if (!seriesObj || typeof seriesObj !== 'object') {
+                container.style.display = 'none';
+                return;
+            }
+
+            const codes = ['DE', 'US', 'GB', 'FR', 'IT'];
+            const pointsByCode = {};
+            for (const code of codes) {
+                const arr = Array.isArray(seriesObj[code]) ? seriesObj[code] : [];
+                pointsByCode[code] = arr.filter(p => p && typeof p.date === 'string' && typeof p.yield === 'number' && Number.isFinite(p.yield));
+            }
+
+            const dateSet = new Set();
+            for (const code of codes) {
+                for (const p of pointsByCode[code]) dateSet.add(p.date);
+            }
+            const dates = Array.from(dateSet).sort();
+            if (dates.length < 2) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = '';
+
+            const labels = dates.map(formatMonthDay);
+
+            const colorByCode = {
+                DE: '#00d4ff',
+                US: '#fbbf24',
+                GB: '#a78bfa',
+                FR: '#fb7185',
+                IT: '#fb923c'
+            };
+
+            const nameByCode = {
+                DE: 'Germany',
+                US: 'United States',
+                GB: 'United Kingdom',
+                FR: 'France',
+                IT: 'Italy'
+            };
+
+            const datasets = codes.map(code => {
+                const map = new Map(pointsByCode[code].map(p => [p.date, p.yield]));
+                const data = dates.map(d => (map.has(d) ? map.get(d) : null));
+                return {
+                    label: nameByCode[code],
+                    _code: code,
+                    data,
+                    borderColor: colorByCode[code] || '#e5e7eb',
+                    backgroundColor: 'transparent',
+                    borderWidth: code === 'DE' ? 3 : 1.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    tension: 0.25,
+                    spanGaps: false
+                };
+            });
+
+            const ctx = canvas.getContext('2d');
+            if (comparisonChartInstance) {
+                comparisonChartInstance.destroy();
+                comparisonChartInstance = null;
+            }
+
+            if (noteEl) {
+                const asOf = COMPARISON_DATA?.asOfDate ? formatMonthDayYear(COMPARISON_DATA.asOfDate) : 'latest available';
+                noteEl.textContent = `1-year daily yields • Germany: Bundesbank • Others: FRED • Germany bolded • As of ${asOf}`;
+            }
+
+            comparisonChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: v => v.toFixed(2) + '%' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', maxRotation: 0, autoSkip: true }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function fetchComparison() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            try {
+                const res = await fetch('/.netlify/functions/bond-yields-1y', {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data || !data.series) throw new Error('Bad response');
+                COMPARISON_DATA = data;
+
+                const btn = document.getElementById('downloadComparisonCsv');
+                if (btn) btn.disabled = false;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        function buildBundCsvRows() {
+            const rows = [['date', 'yield']];
+            const points = Array.isArray(LIVE_SERIES) ? LIVE_SERIES : [];
+            for (const p of points) {
+                rows.push([p.date, p.yield]);
+            }
+            return rows;
+        }
+
+        function buildComparisonCsvRows() {
+            const codes = ['DE', 'US', 'GB', 'FR', 'IT'];
+            const seriesObj = COMPARISON_DATA?.series || {};
+            const dateSet = new Set();
+            for (const code of codes) {
+                const arr = Array.isArray(seriesObj[code]) ? seriesObj[code] : [];
+                for (const p of arr) dateSet.add(p.date);
+            }
+            const dates = Array.from(dateSet).sort();
+
+            const header = ['date', ...codes];
+            const rows = [header];
+
+            const maps = {};
+            for (const code of codes) {
+                const arr = Array.isArray(seriesObj[code]) ? seriesObj[code] : [];
+                maps[code] = new Map(arr.map(p => [p.date, p.yield]));
+            }
+
+            for (const d of dates) {
+                const row = [d];
+                for (const code of codes) row.push(maps[code].has(d) ? maps[code].get(d) : '');
+                rows.push(row);
+            }
+            return rows;
+        }
+
         function render() {
             // Calculate values
             const changePercent = CURRENT_YIELD - BASELINE_YIELD;
@@ -798,6 +1036,8 @@
                 }
 
                 LIVE_SERIES = Array.isArray(data.series) ? data.series : null;
+                const bundBtn = document.getElementById('downloadBundCsv');
+                if (bundBtn && LIVE_SERIES) bundBtn.disabled = false;
 
                 const asOf = data.asOfDate || data.observationDate;
                 if (asOf && /^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
@@ -816,6 +1056,22 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
+            const bundBtn = document.getElementById('downloadBundCsv');
+            if (bundBtn) {
+                bundBtn.addEventListener('click', () => {
+                    if (!LIVE_SERIES) return;
+                    downloadCsv(`bund_yield_series_${(COMPARISON_DATA?.asOfDate || 'asof')}.csv`, buildBundCsvRows());
+                });
+            }
+
+            const compBtn = document.getElementById('downloadComparisonCsv');
+            if (compBtn) {
+                compBtn.addEventListener('click', () => {
+                    if (!COMPARISON_DATA) return;
+                    downloadCsv(`10y_yield_comparison_1y_${COMPARISON_DATA.asOfDate || 'asof'}.csv`, buildComparisonCsvRows());
+                });
+            }
+
             try {
                 await fetchLiveYield();
             } catch (e) {
@@ -828,7 +1084,16 @@
                 }
             }
 
+            try {
+                await fetchComparison();
+            } catch (e) {
+                console.warn('Live comparison fetch failed; hiding chart.', e);
+                const container = document.getElementById('comparisonChartContainer');
+                if (container) container.style.display = 'none';
+            }
+
             render();
+            renderComparisonChart();
         });
     </script>
 </body>
