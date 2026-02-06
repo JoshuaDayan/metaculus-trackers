@@ -856,7 +856,7 @@
 
             if (noteEl) {
                 const asOf = COMPARISON_DATA?.asOfDate ? formatMonthDayYear(COMPARISON_DATA.asOfDate) : 'latest available';
-                noteEl.textContent = `1-year daily yields • Germany bolded • As of ${asOf}`;
+                noteEl.textContent = `1-year daily yields • Germany: Bundesbank • Others: FRED • Germany bolded • As of ${asOf}`;
             }
 
             comparisonChartInstance = new Chart(ctx, {
