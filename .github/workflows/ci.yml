@@ -20,8 +20,9 @@ jobs:
         run: |
           node --check netlify/functions/fx-tracker.js
           node --check netlify/functions/bond-yield.js
+          node --check netlify/functions/fx-history.js
+          node --check netlify/functions/bond-yields-1y.js
 
       - name: Unit tests (mocked upstream)
         run: |
-          node --test scripts/bond-yield.test.js scripts/fx-tracker.test.js
-
+          node --test scripts/bond-yield.test.js scripts/fx-tracker.test.js scripts/fx-history.test.js scripts/bond-yields-1y.test.js

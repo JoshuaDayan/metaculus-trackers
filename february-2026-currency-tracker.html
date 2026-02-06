@@ -114,6 +114,45 @@
             margin-bottom: 8px;
         }
 
+        .download-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .download-btn {
+            appearance: none;
+            border: 1px solid rgba(74, 222, 128, 0.5);
+            background: rgba(74, 222, 128, 0.12);
+            color: #4ade80;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .download-btn.secondary {
+            border-color: rgba(0, 212, 255, 0.4);
+            background: rgba(0, 212, 255, 0.08);
+            color: #00d4ff;
+        }
+
+        .download-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            background: rgba(74, 222, 128, 0.18);
+        }
+
+        .download-btn.secondary:hover:not(:disabled) {
+            background: rgba(0, 212, 255, 0.12);
+        }
+
+        .download-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
         .status-bar {
             display: flex;
             justify-content: space-between;
@@ -357,6 +396,11 @@
             <p><strong>All values scraped directly from Yahoo Finance.</strong></p>
             <p><strong>Baseline:</strong> January 30, 2026 (Friday close — Jan 31 was Saturday)</p>
             <p><strong>Last Updated:</strong> <span id="lastUpdated" data-fallback="February 04, 2026 at 02:21 PM GMT" style="color:#4ade80; font-weight: bold;">Loading…</span></p>
+            <div class="download-row">
+                <button class="download-btn" id="downloadSnapshotCsv" type="button">Download CSV (Snapshot)</button>
+                <button class="download-btn secondary" id="downloadFebDailyCsv" type="button" disabled>Download CSV (Feb Daily)</button>
+                <button class="download-btn secondary" id="downloadHistoryCsv" type="button" disabled>Download CSV (1Y + DXY)</button>
+            </div>
         </div>
 
         <div class="status-bar">
@@ -392,6 +436,14 @@
             <p class="chart-note" id="performanceChartNote"></p>
             <div class="chart-wrapper">
                 <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container" id="dxyChartContainer">
+            <h3 class="chart-title">💵 1-Year USD Strength (DXY) vs Currencies</h3>
+            <p class="chart-note" id="dxyChartNote"></p>
+            <div class="chart-wrapper">
+                <canvas id="dxyChart"></canvas>
             </div>
         </div>
 
@@ -698,6 +750,70 @@
 
         let performanceChartInstance = null;
         let LIVE_SERIES = null;
+        let dxyChartInstance = null;
+        let HISTORY_SERIES = null;
+        let HISTORY_BASELINE_DATE = null;
+        let HISTORY_ASOF_DATE = null;
+
+        function csvEscape(value) {
+            const s = String(value ?? '');
+            if (/[\",\\n]/.test(s)) return '\"' + s.replace(/\"/g, '\"\"') + '\"';
+            return s;
+        }
+
+        function downloadCsv(filename, rows) {
+            const csv = rows.map(r => r.map(csvEscape).join(',')).join('\\n') + '\\n';
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function buildSnapshotCsv(results) {
+            const rows = [
+                ['Currency', 'Name', 'BaselineDate', 'AsOfDate', 'BaselineCloseUSD', 'AsOfCloseUSD', 'PctChange']
+            ];
+            for (const r of results) {
+                rows.push([
+                    r.code,
+                    CURRENCIES[r.code]?.name || r.code,
+                    BASELINE_DATE,
+                    ASOF_DATE,
+                    r.baseline,
+                    r.current,
+                    r.change
+                ]);
+            }
+            return rows;
+        }
+
+        function buildWideSeriesCsv(series, codes, prefix) {
+            const rows = [];
+            const header = ['date'];
+            for (const code of codes) {
+                header.push(`${code}_${prefix}_close`);
+                header.push(`${code}_${prefix}_pct`);
+            }
+            rows.push(header);
+
+            const dates = series?.dates || [];
+            for (let i = 0; i < dates.length; i += 1) {
+                const row = [dates[i]];
+                for (const code of codes) {
+                    const closeArr = series?.close?.[code] || [];
+                    const pctArr = series?.pct?.[code] || [];
+                    row.push(closeArr[i] ?? '');
+                    row.push(pctArr[i] ?? '');
+                }
+                rows.push(row);
+            }
+            return rows;
+        }
 
         function renderPerformanceChart(results) {
             const container = document.getElementById('performanceChartContainer');
@@ -787,6 +903,117 @@
             });
         }
 
+        function formatCloseForCode(code, value) {
+            if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+            if (code === 'DXY') return Number(value).toFixed(2);
+            return formatNum(Number(value));
+        }
+
+        function renderDxyChart() {
+            const container = document.getElementById('dxyChartContainer');
+            const noteEl = document.getElementById('dxyChartNote');
+            const canvas = document.getElementById('dxyChart');
+            if (!container || !canvas) return;
+
+            if (!HISTORY_SERIES || !Array.isArray(HISTORY_SERIES.dates) || !HISTORY_SERIES.pct || !HISTORY_SERIES.close) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = '';
+
+            const labels = HISTORY_SERIES.dates.map(formatMonthDay);
+            const datasets = [];
+
+            const dxyPct = HISTORY_SERIES.pct.DXY || [];
+            datasets.push({
+                label: 'DXY (US Dollar Index)',
+                _code: 'DXY',
+                data: dxyPct,
+                borderColor: '#00d4ff',
+                backgroundColor: 'rgba(0, 212, 255, 0.08)',
+                borderWidth: 3,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.25,
+                fill: false
+            });
+
+            const grey = 'rgba(229, 231, 235, 0.28)';
+            for (const code of Object.keys(CURRENCIES)) {
+                const pct = HISTORY_SERIES.pct[code] || [];
+                datasets.push({
+                    label: `${CURRENCIES[code].name} (${code})`,
+                    _code: code,
+                    data: pct,
+                    borderColor: grey,
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    tension: 0.25,
+                    fill: false
+                });
+            }
+
+            const ctx = canvas.getContext('2d');
+            if (dxyChartInstance) {
+                dxyChartInstance.destroy();
+                dxyChartInstance = null;
+            }
+
+            if (noteEl) {
+                const base = HISTORY_BASELINE_DATE ? formatMonthDayYear(HISTORY_BASELINE_DATE) : '—';
+                const asof = HISTORY_ASOF_DATE ? formatMonthDayYear(HISTORY_ASOF_DATE) : '—';
+                noteEl.textContent = `All series show % change from ${base} • Bold line: DXY • Hover grey lines for currency details • As of ${asof}`;
+            }
+
+            dxyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                color: '#bbb',
+                                usePointStyle: true,
+                                boxWidth: 10,
+                                padding: 14,
+                                filter: (legendItem) => legendItem.datasetIndex === 0
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const code = ctx.dataset._code || ctx.dataset.label;
+                                    const idx = ctx.dataIndex;
+                                    const pct = ctx.parsed.y;
+                                    const close = HISTORY_SERIES.close?.[code]?.[idx];
+                                    const pctText = Number.isFinite(pct) ? `${pct.toFixed(2)}%` : '—';
+                                    const closeText = formatCloseForCode(code, close);
+                                    return `${ctx.dataset.label}: ${pctText} (${closeText})`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: v => v.toFixed(1) + '%' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', maxRotation: 0, autoSkip: true }
+                        }
+                    }
+                }
+            });
+        }
+
         async function fetchLiveData() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -814,8 +1041,57 @@
             }
         }
 
+        async function fetchHistoryData() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            try {
+                const res = await fetch('/.netlify/functions/fx-history', {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data || !data.series || !Array.isArray(data.series.dates)) throw new Error('Bad response');
+
+                HISTORY_SERIES = data.series;
+                HISTORY_BASELINE_DATE = data.baselineDate || null;
+                HISTORY_ASOF_DATE = data.asOfDate || null;
+
+                const btn = document.getElementById('downloadHistoryCsv');
+                if (btn) btn.disabled = false;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
+            const snapshotBtn = document.getElementById('downloadSnapshotCsv');
+            if (snapshotBtn) {
+                snapshotBtn.addEventListener('click', () => {
+                    const results = calculateResults();
+                    downloadCsv(`currency_feb2026_snapshot_${ASOF_DATE}.csv`, buildSnapshotCsv(results));
+                });
+            }
+
+            const febBtn = document.getElementById('downloadFebDailyCsv');
+            if (febBtn) {
+                febBtn.addEventListener('click', () => {
+                    if (!LIVE_SERIES) return;
+                    const codes = Object.keys(CURRENCIES);
+                    downloadCsv(`currency_feb2026_daily_${ASOF_DATE}.csv`, buildWideSeriesCsv(LIVE_SERIES, codes, 'feb'));
+                });
+            }
+
+            const histBtn = document.getElementById('downloadHistoryCsv');
+            if (histBtn) {
+                histBtn.addEventListener('click', () => {
+                    if (!HISTORY_SERIES) return;
+                    const codes = ['DXY', ...Object.keys(CURRENCIES)];
+                    downloadCsv(`currency_1y_dxy_${HISTORY_ASOF_DATE || 'asof'}.csv`, buildWideSeriesCsv(HISTORY_SERIES, codes, '1y'));
+                });
+            }
+
             try {
                 await fetchLiveData();
             } catch (e) {
@@ -827,6 +1103,14 @@
                 }
             }
 
+            try {
+                await fetchHistoryData();
+            } catch (e) {
+                console.warn('Live 1Y/DXY fetch failed; hiding chart.', e);
+                const container = document.getElementById('dxyChartContainer');
+                if (container) container.style.display = 'none';
+            }
+
             setDateLabels();
             const results = calculateResults();
             renderLeader(results);
@@ -834,6 +1118,9 @@
             renderTable(results);
             renderChart(results);
             renderPerformanceChart(results);
+            renderDxyChart();
+
+            if (febBtn && LIVE_SERIES) febBtn.disabled = false;
         });
     </script>
 </body>
