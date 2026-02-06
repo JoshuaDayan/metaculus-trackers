@@ -77,7 +77,7 @@ function intersection(a, b) {
 async function fetchBundesbankSeries({ startDate, endDate }) {
   const res = await fetch(BUNDESBANK_URL, {
     headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (Netlify bond-yields-1y)" },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(12_000),
   });
   if (!res.ok) {
     throw new Error(`Bundesbank request failed: ${res.status} ${res.statusText}`);
@@ -114,39 +114,54 @@ async function fetchBundesbankSeries({ startDate, endDate }) {
   return out;
 }
 
-async function fetchFredSeries(seriesId, { startDate, endDate }) {
-  const params = new URLSearchParams({ id: seriesId, cosd: startDate, coed: endDate });
+async function fetchFredMultiSeries(seriesIds, { startDate, endDate }) {
+  const params = new URLSearchParams({ id: seriesIds.join(","), cosd: startDate, coed: endDate });
   const url = `https://fred.stlouisfed.org/graph/fredgraph.csv?${params.toString()}`;
 
   const res = await fetch(url, {
     headers: { Accept: "text/csv", "User-Agent": "Mozilla/5.0 (Netlify bond-yields-1y)" },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(12_000),
   });
-  if (!res.ok) throw new Error(`FRED request failed for ${seriesId}: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    throw new Error(`FRED request failed: ${res.status} ${res.statusText}`);
+  }
 
   const text = await res.text();
   const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) throw new Error(`FRED response too short for ${seriesId}`);
+  if (lines.length < 2) throw new Error("FRED response too short");
 
-  const out = [];
+  const header = lines[0].split(",").map((s) => s.trim());
+  if (!header.length || header[0].toUpperCase() !== "DATE") {
+    throw new Error("FRED response header missing DATE column");
+  }
+  const ids = header.slice(1);
+  if (!ids.length) throw new Error("FRED response missing series columns");
+
+  const outById = Object.fromEntries(ids.map((id) => [id, []]));
+
   for (let i = 1; i < lines.length; i += 1) {
     const line = lines[i].trim();
     if (!line) continue;
-    const [date, valueStr] = line.split(",");
-    if (!date || !valueStr) continue;
+    const cols = line.split(",");
+    const date = (cols[0] || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     if (date < startDate || date > endDate) continue;
 
     const dateObj = parseISODate(date);
     if (!dateObj || !isWeekday(dateObj)) continue;
 
-    if (valueStr === ".") continue;
-    const y = Math.round(Number(valueStr) * 100) / 100;
-    if (!Number.isFinite(y)) continue;
-
-    out.push({ date, yield: y });
+    for (let j = 0; j < ids.length; j += 1) {
+      const id = ids[j];
+      const valueStr = (cols[j + 1] || "").trim();
+      if (!id) continue;
+      if (!valueStr || valueStr === ".") continue;
+      const y = Math.round(Number(valueStr) * 100) / 100;
+      if (!Number.isFinite(y)) continue;
+      outById[id].push({ date, yield: y });
+    }
   }
 
-  return out;
+  return outById;
 }
 
 exports.handler = async (event) => {
@@ -160,30 +175,48 @@ exports.handler = async (event) => {
 
     const fetchedAt = new Date().toISOString();
 
-    const [deSeries, usSeries, gbSeries, frSeries, itSeries] = await Promise.all([
+    const errors = {};
+    const series = { DE: [], US: [], GB: [], FR: [], IT: [] };
+
+    const fredIds = Object.values(FRED).map((v) => v.id);
+    const [deRes, fredRes] = await Promise.allSettled([
       fetchBundesbankSeries({ startDate, endDate }),
-      fetchFredSeries(FRED.US.id, { startDate, endDate }),
-      fetchFredSeries(FRED.GB.id, { startDate, endDate }),
-      fetchFredSeries(FRED.FR.id, { startDate, endDate }),
-      fetchFredSeries(FRED.IT.id, { startDate, endDate }),
+      fetchFredMultiSeries(fredIds, { startDate, endDate }),
     ]);
 
-    const series = {
-      DE: deSeries,
-      US: usSeries,
-      GB: gbSeries,
-      FR: frSeries,
-      IT: itSeries,
-    };
+    if (deRes.status === "fulfilled") {
+      series.DE = deRes.value;
+    } else {
+      errors.DE = deRes.reason instanceof Error ? deRes.reason.message : String(deRes.reason);
+    }
+
+    if (fredRes.status === "fulfilled") {
+      const outById = fredRes.value || {};
+      series.US = Array.isArray(outById[FRED.US.id]) ? outById[FRED.US.id] : [];
+      series.GB = Array.isArray(outById[FRED.GB.id]) ? outById[FRED.GB.id] : [];
+      series.FR = Array.isArray(outById[FRED.FR.id]) ? outById[FRED.FR.id] : [];
+      series.IT = Array.isArray(outById[FRED.IT.id]) ? outById[FRED.IT.id] : [];
+    } else {
+      errors.FRED = fredRes.reason instanceof Error ? fredRes.reason.message : String(fredRes.reason);
+    }
+
+    const availableCodes = Object.keys(series).filter((code) => series[code] && series[code].length);
+    if (!availableCodes.length) {
+      throw new Error(`No yield series available (${Object.values(errors).join("; ") || "unknown error"})`);
+    }
 
     // Latest common date across all series (helps the UI display an "as of").
     let common = null;
-    for (const code of Object.keys(series)) {
-      const set = new Set(series[code].map((p) => p.date));
+    for (const code of availableCodes) {
+      const set = new Set((series[code] || []).map((p) => p.date));
       common = common ? intersection(common, set) : set;
     }
     const commonDates = common && common.size ? Array.from(common).sort() : [];
-    const asOfDate = commonDates.length ? commonDates.at(-1) : null;
+    let asOfDate = commonDates.length ? commonDates.at(-1) : null;
+    if (!asOfDate) {
+      const first = availableCodes[0];
+      asOfDate = series[first][series[first].length - 1].date || null;
+    }
 
     const body = {
       window: "1y",
@@ -192,6 +225,7 @@ exports.handler = async (event) => {
       asOfDate,
       fetchedAt,
       lastUpdated: formatTimestampUtc(fetchedAt),
+      errors: Object.keys(errors).length ? errors : null,
       countries: {
         DE: {
           name: "Germany",
@@ -234,4 +268,3 @@ exports.handler = async (event) => {
     };
   }
 };
-

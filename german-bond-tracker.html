@@ -529,7 +529,7 @@
 
         <div class="chart-container" id="comparisonChartContainer">
             <h3 class="chart-title">🌍 1-Year 10Y Yield Comparison</h3>
-            <p class="chart-note" id="comparisonChartNote"></p>
+            <p class="chart-note" id="comparisonChartNote">Loading…</p>
             <div class="chart-wrapper">
                 <canvas id="comparisonChart"></canvas>
             </div>
@@ -791,7 +791,10 @@
 
             const seriesObj = COMPARISON_DATA?.series;
             if (!seriesObj || typeof seriesObj !== 'object') {
-                container.style.display = 'none';
+                container.style.display = '';
+                if (noteEl && !noteEl.textContent) {
+                    noteEl.textContent = 'Loading…';
+                }
                 return;
             }
 
@@ -802,13 +805,17 @@
                 pointsByCode[code] = arr.filter(p => p && typeof p.date === 'string' && typeof p.yield === 'number' && Number.isFinite(p.yield));
             }
 
+            const availableCodes = codes.filter(code => pointsByCode[code].length);
+            const missingCodes = codes.filter(code => !pointsByCode[code].length);
+
             const dateSet = new Set();
-            for (const code of codes) {
+            for (const code of availableCodes) {
                 for (const p of pointsByCode[code]) dateSet.add(p.date);
             }
             const dates = Array.from(dateSet).sort();
             if (dates.length < 2) {
-                container.style.display = 'none';
+                container.style.display = '';
+                if (noteEl) noteEl.textContent = 'Comparison data unavailable.';
                 return;
             }
             container.style.display = '';
@@ -831,7 +838,7 @@
                 IT: 'Italy'
             };
 
-            const datasets = codes.map(code => {
+            const datasets = availableCodes.map(code => {
                 const map = new Map(pointsByCode[code].map(p => [p.date, p.yield]));
                 const data = dates.map(d => (map.has(d) ? map.get(d) : null));
                 return {
@@ -856,7 +863,8 @@
 
             if (noteEl) {
                 const asOf = COMPARISON_DATA?.asOfDate ? formatMonthDayYear(COMPARISON_DATA.asOfDate) : 'latest available';
-                noteEl.textContent = `1-year daily yields • Germany: Bundesbank • Others: FRED • Germany bolded • As of ${asOf}`;
+                const missingText = missingCodes.length ? ` • Missing: ${missingCodes.join(', ')}` : '';
+                noteEl.textContent = `1-year daily yields • Germany: Bundesbank • Others: FRED • Germany bolded • As of ${asOf}${missingText}`;
             }
 
             comparisonChartInstance = new Chart(ctx, {
@@ -894,7 +902,7 @@
 
         async function fetchComparison() {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const timeoutId = setTimeout(() => controller.abort(), 9000);
             try {
                 const res = await fetch('/.netlify/functions/bond-yields-1y', {
                     headers: { 'Accept': 'application/json' },
@@ -913,10 +921,13 @@
         }
 
         function buildBundCsvRows() {
-            const rows = [['date', 'yield']];
+            const upperTrigger = BASELINE_YIELD + (THRESHOLD_BP / 100);
+            const lowerTrigger = BASELINE_YIELD - (THRESHOLD_BP / 100);
+            const rows = [['date', 'yield_percent', 'baseline_yield_percent', 'change_bp', 'upper_trigger_percent', 'lower_trigger_percent']];
             const points = Array.isArray(LIVE_SERIES) ? LIVE_SERIES : [];
             for (const p of points) {
-                rows.push([p.date, p.yield]);
+                const changeBp = Math.round((Number(p.yield) - BASELINE_YIELD) * 100);
+                rows.push([p.date, p.yield, BASELINE_YIELD, changeBp, upperTrigger, lowerTrigger]);
             }
             return rows;
         }
@@ -924,28 +935,28 @@
         function buildComparisonCsvRows() {
             const codes = ['DE', 'US', 'GB', 'FR', 'IT'];
             const seriesObj = COMPARISON_DATA?.series || {};
-            const dateSet = new Set();
+            const meta = COMPARISON_DATA?.countries || {};
+
+            const rows = [['date', 'country_code', 'country_name', 'yield_percent', 'provider', 'series_id']];
+            const out = [];
+
             for (const code of codes) {
                 const arr = Array.isArray(seriesObj[code]) ? seriesObj[code] : [];
-                for (const p of arr) dateSet.add(p.date);
+                const m = meta[code] || {};
+                for (const p of arr) {
+                    out.push([
+                        p.date,
+                        code,
+                        m.name || code,
+                        p.yield,
+                        m.provider || '',
+                        m.seriesId || ''
+                    ]);
+                }
             }
-            const dates = Array.from(dateSet).sort();
 
-            const header = ['date', ...codes];
-            const rows = [header];
-
-            const maps = {};
-            for (const code of codes) {
-                const arr = Array.isArray(seriesObj[code]) ? seriesObj[code] : [];
-                maps[code] = new Map(arr.map(p => [p.date, p.yield]));
-            }
-
-            for (const d of dates) {
-                const row = [d];
-                for (const code of codes) row.push(maps[code].has(d) ? maps[code].get(d) : '');
-                rows.push(row);
-            }
-            return rows;
+            out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : String(a[1]).localeCompare(String(b[1]))));
+            return rows.concat(out);
         }
 
         function render() {
@@ -1087,9 +1098,9 @@
             try {
                 await fetchComparison();
             } catch (e) {
-                console.warn('Live comparison fetch failed; hiding chart.', e);
-                const container = document.getElementById('comparisonChartContainer');
-                if (container) container.style.display = 'none';
+                console.warn('Live comparison fetch failed; showing placeholder.', e);
+                const noteEl = document.getElementById('comparisonChartNote');
+                if (noteEl) noteEl.textContent = 'Comparison data unavailable (stale).';
             }
 
             render();
