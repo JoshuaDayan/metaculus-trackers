@@ -17,7 +17,7 @@
             padding: 20px;
         }
 
-        .container { max-width: 1400px; margin: 0 auto; }
+        .container { max-width: 1600px; margin: 0 auto; }
 
         /* Navigation */
         .nav {
@@ -172,6 +172,15 @@
             gap: 20px;
             margin-bottom: 30px;
         }
+
+        .dashboard-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .dashboard-row .chart-container { margin-bottom: 0; }
 
         .data-card {
             background: rgba(255,255,255,0.04);
@@ -569,6 +578,23 @@
             </div>
         </div>
 
+        <div class="dashboard-row">
+            <div class="chart-container" id="yieldChartContainer">
+                <h3 class="chart-title">📈 Yield Over Time</h3>
+                <div class="chart-wrapper">
+                    <canvas id="yieldChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container" id="comparisonChartContainer">
+                <h3 class="chart-title">🌍 1-Year 10Y Yield Comparison</h3>
+                <p class="chart-note" id="comparisonChartNote">Loading…</p>
+                <div class="chart-wrapper">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+            </div>
+        </div>
+
         <div class="chart-container">
             <h3 class="chart-title">📊 Distance to ±20bp Threshold</h3>
             <div class="gauge">
@@ -582,21 +608,6 @@
                 <span>+20bp (YES)</span>
             </div>
             <div class="gauge-center-label" id="gaugeLabel">Currently at baseline</div>
-        </div>
-
-        <div class="chart-container" id="yieldChartContainer">
-            <h3 class="chart-title">📈 Yield Over Time</h3>
-            <div class="chart-wrapper">
-                <canvas id="yieldChart"></canvas>
-            </div>
-        </div>
-
-        <div class="chart-container" id="comparisonChartContainer">
-            <h3 class="chart-title">🌍 1-Year 10Y Yield Comparison</h3>
-            <p class="chart-note" id="comparisonChartNote">Loading…</p>
-            <div class="chart-wrapper">
-                <canvas id="comparisonChart"></canvas>
-            </div>
         </div>
 
         <div class="chart-container">

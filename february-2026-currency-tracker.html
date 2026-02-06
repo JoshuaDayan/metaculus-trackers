@@ -17,7 +17,7 @@
             padding: 20px;
         }
 
-        .container { max-width: 1400px; margin: 0 auto; }
+        .container { max-width: 1600px; margin: 0 auto; }
 
         /* Navigation */
         .nav {
@@ -200,6 +200,15 @@
             gap: 20px;
             margin-bottom: 30px;
         }
+
+        .dashboard-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .dashboard-row .chart-container { margin-bottom: 0; }
 
         .currency-card {
             background: rgba(255,255,255,0.04);
@@ -451,33 +460,37 @@
 
         <div id="currencyGrid" class="grid"></div>
 
-        <div class="chart-container">
-            <h3 class="chart-title">📊 February 2026 Performance Ranking (% Change from Baseline)</h3>
-            <div class="chart-wrapper">
-                <canvas id="barChart"></canvas>
+        <div class="dashboard-row">
+            <div class="chart-container">
+                <h3 class="chart-title">📊 February 2026 Performance Ranking (% Change from Baseline)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container" id="performanceChartContainer">
+                <h3 class="chart-title">📈 Daily Performance (% Change vs Baseline Close)</h3>
+                <p class="chart-note" id="performanceChartNote"></p>
+                <div class="chart-wrapper">
+                    <canvas id="performanceChart"></canvas>
+                </div>
             </div>
         </div>
 
-        <div class="chart-container" id="performanceChartContainer">
-            <h3 class="chart-title">📈 Daily Performance (% Change vs Baseline Close)</h3>
-            <p class="chart-note" id="performanceChartNote"></p>
-            <div class="chart-wrapper">
-                <canvas id="performanceChart"></canvas>
+        <div class="dashboard-row">
+            <div class="chart-container" id="dxyChartContainer">
+                <h3 class="chart-title">💵 1-Year USD Strength (DXY) vs Currencies</h3>
+                <p class="chart-note" id="dxyChartNote"></p>
+                <div class="chart-wrapper">
+                    <canvas id="dxyChart"></canvas>
+                </div>
             </div>
-        </div>
 
-        <div class="chart-container" id="dxyChartContainer">
-            <h3 class="chart-title">💵 1-Year USD Strength (DXY) vs Currencies</h3>
-            <p class="chart-note" id="dxyChartNote"></p>
-            <div class="chart-wrapper">
-                <canvas id="dxyChart"></canvas>
+            <div class="chart-container" id="monthlyWinnersContainer">
+                <h3 class="chart-title">🗓️ Monthly FX Winners (2025–Jan 2026)</h3>
+                <p class="chart-note" id="monthlyWinnersNote">Loading…</p>
+                <div id="monthlyWinnersList" class="month-list"></div>
             </div>
-        </div>
-
-        <div class="chart-container" id="monthlyWinnersContainer">
-            <h3 class="chart-title">🗓️ Monthly FX Winners (2025–Jan 2026)</h3>
-            <p class="chart-note" id="monthlyWinnersNote">Loading…</p>
-            <div id="monthlyWinnersList" class="month-list"></div>
         </div>
 
         <div class="chart-container">
