@@ -24,7 +24,8 @@ jobs:
           node --check netlify/functions/bond-yields-1y.js
           node --check netlify/functions/bond-monthly-flags.js
           node --check netlify/functions/fx-monthly-winners.js
+          node --check netlify/functions/comments.js
 
       - name: Unit tests (mocked upstream)
         run: |
-          node --test scripts/bond-yield.test.js scripts/fx-tracker.test.js scripts/fx-history.test.js scripts/bond-yields-1y.test.js scripts/bond-monthly-flags.test.js scripts/fx-monthly-winners.test.js
+          node --test scripts/bond-yield.test.js scripts/fx-tracker.test.js scripts/fx-history.test.js scripts/bond-yields-1y.test.js scripts/bond-monthly-flags.test.js scripts/fx-monthly-winners.test.js scripts/comments.test.js
