@@ -558,7 +558,10 @@
         <div class="top-panels">
             <div class="panel-card" id="feedbackPanel">
                 <h3 class="panel-title" id="feedbackTitle">Feedback</h3>
-                <p class="panel-subtitle" id="feedbackSubtitle">Send private feedback to the site owner.</p>
+                <p class="panel-subtitle" id="feedbackSubtitle">
+                    Data quality issues? UI complaints? Wildly impractical feature suggestions? Tell us!<br><br>
+                    Private: this goes straight to the site owner and will not appear on the page.
+                </p>
 
                 <form id="feedbackForm" name="sf-feedback" method="POST" data-netlify="true" netlify-honeypot="bot-field-feedback">
                     <input type="hidden" name="form-name" value="sf-feedback">
@@ -567,7 +570,7 @@
                         <label>Don’t fill this out: <input name="bot-field-feedback"></label>
                     </div>
 
-                    <textarea class="field" id="feedbackMessage" name="message" placeholder="(Placeholder) Type feedback here…" required></textarea>
+                    <textarea class="field" id="feedbackMessage" name="message" placeholder="Type feedback here (private) …" required></textarea>
                     <div class="form-actions">
                         <button class="download-btn secondary" id="feedbackSubmit" type="submit">Send</button>
                     </div>
@@ -588,7 +591,11 @@
 
             <div class="panel-card" id="commentsPanel">
                 <h3 class="panel-title" id="commentsTitle">Comments</h3>
-                <p class="panel-subtitle" id="commentsSubtitle">Public thread. Keep it short and on-topic.</p>
+                <p class="panel-subtitle" id="commentsSubtitle">
+                    Thoughts that a Metaculus admin shouldn’t have to see? Questions you don’t want your future Bridgewater manager to read?<br><br>
+                    This is the place to ask and (politely) answer.<br><br>
+                    Public: comments appear on this page and are visible to everyone.
+                </p>
 
                 <form id="commentsForm" name="sf-comments-bond" method="POST" data-netlify="true" netlify-honeypot="bot-field-comments-bond">
                     <input type="hidden" name="form-name" value="sf-comments-bond">
@@ -598,7 +605,7 @@
                         <label>Don’t fill this out: <input name="bot-field-comments-bond"></label>
                     </div>
 
-                    <textarea class="field" id="commentMessage" name="message" placeholder="(Placeholder) Drop a comment…" required></textarea>
+                    <textarea class="field" id="commentMessage" name="message" placeholder="Write a comment (public) …" required></textarea>
                     <div class="form-actions">
                         <button class="download-btn secondary" id="commentSubmit" type="submit">Post</button>
                         <button class="download-btn" id="commentRefresh" type="button">Refresh</button>
