@@ -66,7 +66,11 @@
             background-clip: text;
         }
 
-        .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
+	        .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
+	        .subtitle a { color: #00d4ff; text-decoration: underline; text-underline-offset: 2px; }
+	        .subtitle a:hover { text-decoration-thickness: 2px; }
+	        .subtitle a .ext { font-size: 0.85em; opacity: 0.8; margin-left: 6px; }
+	        .subtitle a:hover .ext { opacity: 1; }
 
         .foundation-subtitle {
             font-family: 'Cinzel', serif;
@@ -91,7 +95,9 @@
             color: #ccc;
         }
 
-        .question-box strong { color: #00d4ff; }
+	        .question-box strong { color: #00d4ff; }
+	        .question-box a { color: #00d4ff; text-decoration: none; }
+	        .question-box a:hover { text-decoration: underline; }
 
         .source-box {
             background: linear-gradient(135deg, rgba(74, 222, 128, 0.1), rgba(34, 197, 94, 0.05));
@@ -491,14 +497,16 @@
     <div class="container">
         <header>
             <h1>🌍 February 2026 Currency Tracker</h1>
-            <p class="subtitle">Metaculus Question: Which major currency will increase most (or decrease least) vs USD?</p>
+	            <p class="subtitle"><a href="https://www.metaculus.com/questions/41465/which-major-currency-will-increase-most-during-february-2026/" target="_blank" rel="noopener noreferrer">Metaculus Question: Which major currency will increase most (or decrease least) vs USD?<span class="ext" aria-hidden="true">↗</span></a></p>
             <div class="foundation-subtitle">
                 Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
             </div>
-            <div class="question-box">
-                <strong>Resolution:</strong> March 1, 2026 at 2 PM ET via Yahoo Finance Historical Data<br>
-                <strong>Formula:</strong> <code>(Close_Feb27 − Close_Jan30) / Close_Jan30 × 100</code>
-            </div>
+	            <div class="question-box">
+	                <strong>Metaculus:</strong>
+	                <a href="https://www.metaculus.com/questions/41465/which-major-currency-will-increase-most-during-february-2026/" target="_blank" rel="noopener noreferrer">View question</a><br>
+	                <strong>Resolution:</strong> March 1, 2026 at 2 PM ET via Yahoo Finance Historical Data<br>
+	                <strong>Formula:</strong> <code>(Close_Feb27 − Close_Jan30) / Close_Jan30 × 100</code>
+	            </div>
         </header>
 
         <div class="top-panels">
