@@ -153,6 +153,80 @@
             cursor: not-allowed;
         }
 
+        .top-panels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            align-items: start;
+            margin-bottom: 25px;
+        }
+
+        .top-panels .source-box { margin-bottom: 0; }
+
+        .panel-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .panel-title { color: #fff; font-size: 1rem; margin-bottom: 10px; }
+        .panel-subtitle { color: #888; font-size: 0.85rem; line-height: 1.5; margin-bottom: 12px; }
+
+        .field {
+            width: 100%;
+            appearance: none;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            padding: 10px 12px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            outline: none;
+        }
+
+        .field:focus {
+            border-color: rgba(0, 212, 255, 0.45);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.10);
+        }
+
+        textarea.field { min-height: 110px; resize: vertical; }
+
+        .form-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+        .form-status { margin-top: 10px; font-size: 0.85rem; color: #888; min-height: 1.2em; }
+        .form-status.ok { color: #4ade80; }
+        .form-status.err { color: #f87171; }
+
+        .comment-list {
+            margin-top: 12px;
+            max-height: 280px;
+            overflow: auto;
+            padding-right: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .comment-item {
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 10px 12px;
+        }
+
+        .comment-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 6px;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .comment-handle { color: #00d4ff; font-weight: 600; }
+        .comment-body { color: #ddd; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word; }
+
         .status-bar {
             display: flex;
             justify-content: space-between;
@@ -427,15 +501,68 @@
             </div>
         </header>
 
-        <div class="source-box">
-            <h3>✅ 100% Yahoo Finance Data</h3>
-            <p><strong>All values scraped directly from Yahoo Finance.</strong></p>
-            <p><strong>Baseline:</strong> January 30, 2026 (Friday close — Jan 31 was Saturday)</p>
-            <p><strong>Last Updated:</strong> <span id="lastUpdated" data-fallback="February 04, 2026 at 02:21 PM GMT" style="color:#4ade80; font-weight: bold;">Loading…</span></p>
-            <div class="download-row">
-                <button class="download-btn" id="downloadSnapshotCsv" type="button">Download CSV (Snapshot)</button>
-                <button class="download-btn secondary" id="downloadFebDailyCsv" type="button" disabled>Download CSV (Feb Daily)</button>
-                <button class="download-btn secondary" id="downloadHistoryCsv" type="button" disabled>Download CSV (1Y + DXY)</button>
+        <div class="top-panels">
+            <div class="panel-card" id="feedbackPanel">
+                <h3 class="panel-title" id="feedbackTitle">Feedback</h3>
+                <p class="panel-subtitle" id="feedbackSubtitle">
+                    Data quality issues? UI complaints? Wildly impractical feature suggestions? Tell us!<br><br>
+                    Private: this goes straight to the site owner and will not appear on the page.
+                </p>
+
+                <form id="feedbackForm" name="sf-feedback" method="POST" data-netlify="true" netlify-honeypot="bot-field-feedback">
+                    <input type="hidden" name="form-name" value="sf-feedback">
+                    <input type="hidden" name="page" value="february-2026-currency-tracker">
+                    <div style="display:none;">
+                        <label>Don’t fill this out: <input name="bot-field-feedback"></label>
+                    </div>
+
+                    <textarea class="field" id="feedbackMessage" name="message" placeholder="Type feedback here (private) …" required></textarea>
+                    <div class="form-actions">
+                        <button class="download-btn secondary" id="feedbackSubmit" type="submit">Send</button>
+                    </div>
+                    <div class="form-status" id="feedbackStatus" aria-live="polite"></div>
+                </form>
+            </div>
+
+            <div class="source-box">
+                <h3>✅ 100% Yahoo Finance Data</h3>
+                <p><strong>All values scraped directly from Yahoo Finance.</strong></p>
+                <p><strong>Baseline:</strong> January 30, 2026 (Friday close — Jan 31 was Saturday)</p>
+                <p><strong>Last Updated:</strong> <span id="lastUpdated" data-fallback="February 04, 2026 at 02:21 PM GMT" style="color:#4ade80; font-weight: bold;">Loading…</span></p>
+                <div class="download-row">
+                    <button class="download-btn" id="downloadSnapshotCsv" type="button">Download CSV (Snapshot)</button>
+                    <button class="download-btn secondary" id="downloadFebDailyCsv" type="button" disabled>Download CSV (Feb Daily)</button>
+                    <button class="download-btn secondary" id="downloadHistoryCsv" type="button" disabled>Download CSV (1Y + DXY)</button>
+                </div>
+            </div>
+
+            <div class="panel-card" id="commentsPanel">
+                <h3 class="panel-title" id="commentsTitle">Comments</h3>
+                <p class="panel-subtitle" id="commentsSubtitle">
+                    Thoughts that a Metaculus admin shouldn’t have to see? Questions you don’t want your future Bridgewater manager to read?<br><br>
+                    This is the place to ask and (politely) answer.<br><br>
+                    Public: comments appear on this page and are visible to everyone.
+                </p>
+
+                <form id="commentsForm" name="sf-comments-currency" method="POST" data-netlify="true" netlify-honeypot="bot-field-comments-currency">
+                    <input type="hidden" name="form-name" value="sf-comments-currency">
+                    <input type="hidden" name="page" value="february-2026-currency-tracker">
+                    <input type="hidden" name="handle" id="commentHandle" value="">
+                    <div style="display:none;">
+                        <label>Don’t fill this out: <input name="bot-field-comments-currency"></label>
+                    </div>
+
+                    <textarea class="field" id="commentMessage" name="message" placeholder="Write a comment (public) …" required></textarea>
+                    <div class="form-actions">
+                        <button class="download-btn secondary" id="commentSubmit" type="submit">Post</button>
+                        <button class="download-btn" id="commentRefresh" type="button">Refresh</button>
+                    </div>
+                    <div class="form-status" id="commentStatus" aria-live="polite"></div>
+                </form>
+
+                <div class="comment-list" id="commentList">
+                    <div class="panel-subtitle">Loading…</div>
+                </div>
             </div>
         </div>
 
@@ -828,6 +955,180 @@
             a.click();
             a.remove();
             URL.revokeObjectURL(url);
+        }
+
+        function encodeNetlifyForm(formEl) {
+            const data = new FormData(formEl);
+            return new URLSearchParams(data).toString();
+        }
+
+        async function submitNetlifyForm(formEl) {
+            const body = encodeNetlifyForm(formEl);
+            const res = await fetch('/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function generateForecastHandle() {
+            const a = [
+                'Tetlock', 'Brier', 'BaseRate', 'Calibration', 'OutsideView', 'Signal', 'Noise', 'GJP',
+                'Fermi', 'Bayes', 'Odds', 'Median', 'Priors', 'Update', 'Superforecaster'
+            ];
+            const b = [
+                'SuperSoldier', 'Sleuth', 'Sniper', 'Monk', 'Wizard', 'Oracle', 'Hedgehog', 'Fox',
+                'Quant', 'Scout', 'Analyst', 'Forecaster', 'Estimator', 'Caster'
+            ];
+            const left = a[randInt(0, a.length - 1)];
+            const right = b[randInt(0, b.length - 1)];
+            const num = randInt(10, 999);
+            return `${left}${right}${num}`;
+        }
+
+        function getOrCreateHandle() {
+            const key = 'sf_handle_v1';
+            try {
+                const existing = localStorage.getItem(key);
+                if (existing && typeof existing === 'string') return existing;
+                const h = generateForecastHandle();
+                localStorage.setItem(key, h);
+                return h;
+            } catch {
+                return generateForecastHandle();
+            }
+        }
+
+        function setStatus(el, msg, kind) {
+            if (!el) return;
+            el.textContent = msg || '';
+            el.className = 'form-status' + (kind ? ` ${kind}` : '');
+        }
+
+        function formatCommentTime(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return '';
+            return d.toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: true }) + ' UTC';
+        }
+
+        function renderCommentList(comments) {
+            const listEl = document.getElementById('commentList');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+
+            const items = Array.isArray(comments) ? comments : [];
+            if (!items.length) {
+                const empty = document.createElement('div');
+                empty.className = 'panel-subtitle';
+                empty.textContent = 'No comments yet.';
+                listEl.appendChild(empty);
+                return;
+            }
+
+            for (const c of items) {
+                const item = document.createElement('div');
+                item.className = 'comment-item';
+
+                const head = document.createElement('div');
+                head.className = 'comment-head';
+
+                const handle = document.createElement('div');
+                handle.className = 'comment-handle';
+                handle.textContent = typeof c.handle === 'string' ? c.handle : 'AnonymousForecaster';
+
+                const time = document.createElement('div');
+                time.textContent = formatCommentTime(c.createdAt);
+
+                const body = document.createElement('div');
+                body.className = 'comment-body';
+                body.textContent = typeof c.message === 'string' ? c.message : '';
+
+                head.appendChild(handle);
+                head.appendChild(time);
+                item.appendChild(head);
+                item.appendChild(body);
+                listEl.appendChild(item);
+            }
+        }
+
+        async function loadComments(thread) {
+            const statusEl = document.getElementById('commentStatus');
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            try {
+                setStatus(statusEl, 'Loading…', '');
+                const res = await fetch(`/.netlify/functions/comments?thread=${encodeURIComponent(thread)}`, {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                renderCommentList(data?.comments || []);
+                setStatus(statusEl, '', '');
+            } catch {
+                renderCommentList([]);
+                setStatus(statusEl, 'Comments unavailable.', 'err');
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        function initFeedbackAndComments({ thread }) {
+            const handle = getOrCreateHandle();
+
+            const feedbackForm = document.getElementById('feedbackForm');
+            const feedbackStatus = document.getElementById('feedbackStatus');
+            if (feedbackForm) {
+                feedbackForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    setStatus(feedbackStatus, 'Sending…', '');
+                    try {
+                        await submitNetlifyForm(feedbackForm);
+                        setStatus(feedbackStatus, 'Sent. Thank you.', 'ok');
+                        const msg = document.getElementById('feedbackMessage');
+                        if (msg) msg.value = '';
+                    } catch {
+                        setStatus(feedbackStatus, 'Failed to send. Please try again.', 'err');
+                    }
+                });
+            }
+
+            const commentsForm = document.getElementById('commentsForm');
+            const commentsStatus = document.getElementById('commentStatus');
+            const handleInput = document.getElementById('commentHandle');
+            if (handleInput) handleInput.value = handle;
+
+            if (commentsForm) {
+                commentsForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    setStatus(commentsStatus, 'Posting…', '');
+                    try {
+                        await submitNetlifyForm(commentsForm);
+                        setStatus(commentsStatus, 'Posted.', 'ok');
+                        const msg = document.getElementById('commentMessage');
+                        if (msg) msg.value = '';
+                        await loadComments(thread);
+                    } catch {
+                        setStatus(commentsStatus, 'Failed to post. Please try again.', 'err');
+                    }
+                });
+            }
+
+            const refreshBtn = document.getElementById('commentRefresh');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', async () => {
+                    await loadComments(thread);
+                });
+            }
+
+            // Initial load
+            loadComments(thread);
         }
 
         function buildSnapshotCsv(results) {
@@ -1326,6 +1627,8 @@
                     downloadCsv(`currency_1y_dxy_${HISTORY_ASOF_DATE || 'asof'}.csv`, buildHistoryCsvLong());
                 });
             }
+
+            initFeedbackAndComments({ thread: 'currency' });
 
             try {
                 await fetchLiveData();
