@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /.netlify/
+Disallow: /netlify/
+Disallow: /scripts/
+Sitemap: https://bundandcurrencytrackers.netlify.app/sitemap.xml
