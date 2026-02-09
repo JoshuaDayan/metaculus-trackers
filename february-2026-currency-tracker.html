@@ -17,45 +17,144 @@
             padding: 20px;
         }
 
-        .container { max-width: 1600px; margin: 0 auto; }
+	        .container { max-width: 1600px; margin: 0 auto; }
 
-        /* Navigation */
-        .nav {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-        }
+	        /* Top navigation */
+	        .top-nav {
+	            position: sticky;
+	            top: 10px;
+	            z-index: 1100;
+	            margin-bottom: 18px;
+	        }
 
-        .nav a {
-            display: inline-block;
-            padding: 10px 20px;
-            background: rgba(123, 44, 191, 0.3);
-            border: 1px solid rgba(123, 44, 191, 0.5);
-            border-radius: 8px;
-            color: #00d4ff;
-            text-decoration: none;
-            font-size: 0.85rem;
-            transition: all 0.2s;
-        }
+	        .top-nav-inner {
+	            display: flex;
+	            align-items: center;
+	            justify-content: space-between;
+	            gap: 14px;
+	            padding: 12px 16px;
+	            background: rgba(255,255,255,0.04);
+	            border: 1px solid rgba(255,255,255,0.10);
+	            border-radius: 14px;
+	            backdrop-filter: blur(10px);
+	        }
 
-        .nav a:hover {
-            background: rgba(123, 44, 191, 0.5);
-            transform: translateY(-2px);
-        }
+	        .brand {
+	            display: inline-flex;
+	            align-items: center;
+	            gap: 10px;
+	            color: #e0e0e0;
+	            font-weight: 800;
+	            font-size: 0.9rem;
+	            white-space: nowrap;
+	        }
 
-        @media (max-width: 768px) {
-            .nav { position: static; margin-bottom: 15px; text-align: center; }
-        }
+	        .brand-mark {
+	            width: 12px;
+	            height: 28px;
+	            border-radius: 7px;
+	            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+	        }
 
-        header {
-            text-align: center;
-            margin-bottom: 25px;
-            padding: 25px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.08);
-        }
+	        .nav-tabs {
+	            display: flex;
+	            gap: 8px;
+	            flex-wrap: wrap;
+	            justify-content: center;
+	        }
+
+	        .nav-tab {
+	            display: inline-flex;
+	            align-items: center;
+	            gap: 8px;
+	            padding: 9px 14px;
+	            border-radius: 10px;
+	            border: 1px solid rgba(255,255,255,0.10);
+	            background: rgba(0,0,0,0.20);
+	            color: #cfd6e6;
+	            text-decoration: none;
+	            font-size: 0.85rem;
+	            font-weight: 700;
+	            cursor: pointer;
+	            user-select: none;
+	            transition: all 0.15s ease;
+	        }
+
+	        .nav-tab:hover {
+	            transform: translateY(-1px);
+	            border-color: rgba(255,255,255,0.16);
+	            background: rgba(255,255,255,0.06);
+	        }
+
+	        .nav-tab.active {
+	            background: rgba(0, 212, 255, 0.14);
+	            border-color: rgba(0, 212, 255, 0.35);
+	            color: #9ff0ff;
+	        }
+
+	        .nav-actions { position: relative; display: inline-flex; align-items: center; gap: 8px; }
+	        .nav-btn { appearance: none; }
+
+	        .dropdown {
+	            position: absolute;
+	            right: 0;
+	            top: calc(100% + 10px);
+	            width: 240px;
+	            padding: 10px;
+	            border-radius: 12px;
+	            background: rgba(10, 12, 26, 0.96);
+	            border: 1px solid rgba(255,255,255,0.12);
+	            box-shadow: 0 18px 45px rgba(0,0,0,0.45);
+	        }
+
+	        .dropdown-title { color: #888; font-size: 0.75rem; margin: 2px 6px 8px; }
+
+	        .menu-item {
+	            width: 100%;
+	            display: flex;
+	            align-items: center;
+	            justify-content: space-between;
+	            gap: 10px;
+	            padding: 9px 10px;
+	            border-radius: 10px;
+	            border: 1px solid rgba(255,255,255,0.08);
+	            background: rgba(255,255,255,0.04);
+	            color: #cfd6e6;
+	            text-decoration: none;
+	            cursor: pointer;
+	            font-size: 0.85rem;
+	        }
+
+	        .menu-item:hover {
+	            border-color: rgba(255,255,255,0.14);
+	            background: rgba(255,255,255,0.06);
+	        }
+
+	        .menu-item.primary {
+	            background: rgba(0, 212, 255, 0.12);
+	            border-color: rgba(0, 212, 255, 0.25);
+	            color: #9ff0ff;
+	            font-weight: 800;
+	        }
+
+	        .menu-hint { color: #888; font-size: 0.75rem; }
+
+	        @media (max-width: 768px) {
+	            .top-nav { top: 0; }
+	            .top-nav-inner { flex-wrap: wrap; justify-content: center; }
+	            .brand { width: 100%; justify-content: center; }
+	            .nav-actions { width: 100%; justify-content: center; }
+	            .dropdown { right: 50%; transform: translateX(50%); }
+	        }
+
+	        header {
+	            text-align: center;
+	            margin-bottom: 18px;
+	            padding: 22px;
+	            background: rgba(255,255,255,0.03);
+	            border-radius: 16px;
+	            border: 1px solid rgba(255,255,255,0.08);
+	        }
 
         h1 {
             font-size: 2rem;
@@ -93,6 +192,10 @@
             margin-top: 15px;
             font-size: 0.85rem;
             color: #ccc;
+            text-align: left;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 860px;
         }
 
 	        .question-box strong { color: #00d4ff; }
@@ -230,49 +333,47 @@
             color: #888;
         }
 
-        .comment-handle { color: #00d4ff; font-weight: 600; }
-        .comment-body { color: #ddd; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word; }
+	        .comment-handle { color: #00d4ff; font-weight: 600; }
+	        .comment-body { color: #ddd; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word; }
 
-        .status-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 25px;
-            padding: 15px 20px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.08);
-        }
+	        /* Basic vs Advanced (progressive disclosure) */
+	        .advanced-only { display: none !important; }
+	        body.advanced-open .advanced-only { display: block !important; }
+	        body.advanced-open .top-panels.advanced-only { display: grid !important; }
+	        body.advanced-open .dashboard-row.advanced-only { display: grid !important; }
 
-        .status-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+	        .overview-row {
+	            display: grid;
+	            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+	            gap: 16px;
+	            margin-bottom: 18px;
+	        }
 
-        .status-dot {
-            width: 10px; height: 10px;
-            border-radius: 50%;
-            background: #4ade80;
-        }
+	        .overview-card {
+	            background: rgba(255,255,255,0.04);
+	            border-radius: 16px;
+	            padding: 18px 20px;
+	            border: 1px solid rgba(255,255,255,0.08);
+	        }
 
-        .leader-banner {
-            text-align: center;
-            padding: 30px;
-            margin-bottom: 25px;
-            background: linear-gradient(135deg, rgba(74, 222, 128, 0.12), rgba(34, 197, 94, 0.06));
-            border-radius: 16px;
-            border: 2px solid rgba(74, 222, 128, 0.3);
-        }
+	        .overview-card.good {
+	            background: linear-gradient(135deg, rgba(74, 222, 128, 0.10), rgba(34, 197, 94, 0.05));
+	            border-color: rgba(74, 222, 128, 0.25);
+	        }
 
-        .leader-banner.negative {
-            background: linear-gradient(135deg, rgba(248, 113, 113, 0.12), rgba(239, 68, 68, 0.06));
-            border-color: rgba(248, 113, 113, 0.3);
-        }
+	        .overview-title { font-size: 0.85rem; color: #888; letter-spacing: 0.4px; margin-bottom: 6px; }
+	        .overview-main { font-size: 1.1rem; font-weight: 800; color: #e8eaf3; line-height: 1.2; }
+	        .overview-sub { font-size: 0.9rem; color: #cfd6e6; margin-top: 6px; }
+	        .overview-hint { font-size: 0.8rem; color: #888; margin-top: 8px; line-height: 1.4; }
 
-        .leader-label { font-size: 0.85rem; color: #888; margin-bottom: 8px; letter-spacing: 1px; }
-        .leader-currency { font-size: 2.5rem; font-weight: 700; margin-bottom: 5px; }
-        .leader-change { font-size: 1.6rem; font-weight: 600; }
-        .leader-change.positive { color: #4ade80; }
-        .leader-change.negative { color: #f87171; }
+	        .leader-change { font-size: 1.2rem; font-weight: 800; margin-top: 8px; }
+	        .leader-change.positive { color: #4ade80; }
+	        .leader-change.negative { color: #f87171; }
+
+	        .leader-card.negative {
+	            background: linear-gradient(135deg, rgba(248, 113, 113, 0.10), rgba(239, 68, 68, 0.05));
+	            border-color: rgba(248, 113, 113, 0.25);
+	        }
 
         .grid {
             display: grid;
@@ -400,6 +501,7 @@
         .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
         .chart-note { color: #888; font-size: 0.85rem; margin-top: -12px; margin-bottom: 14px; }
         .chart-wrapper { position: relative; height: 320px; }
+        .chart-wrapper.chart-big { height: 420px; }
 
         .data-table {
             width: 100%;
@@ -480,40 +582,81 @@
             border-left: 3px solid #7b2cbf;
         }
 
-        @media (max-width: 768px) {
-            h1 { font-size: 1.5rem; }
-            .grid { grid-template-columns: 1fr; }
-            .status-bar { flex-direction: column; text-align: center; }
-            .leader-currency { font-size: 2rem; }
-            .foundation-subtitle { font-size: 0.65rem; }
-        }
+	        @media (max-width: 768px) {
+	            h1 { font-size: 1.5rem; }
+	            .grid { grid-template-columns: 1fr; }
+	            .foundation-subtitle { font-size: 0.65rem; }
+	        }
     </style>
-</head>
-<body>
-    <nav class="nav">
-        <a href="german-bond-tracker.html">🇩🇪 Bond Tracker</a>
-    </nav>
-
-    <div class="container">
-        <header>
-            <h1>🌍 February 2026 Currency Tracker</h1>
-	            <p class="subtitle"><a href="https://www.metaculus.com/questions/41465/which-major-currency-will-increase-most-during-february-2026/" target="_blank" rel="noopener noreferrer">Metaculus Question: Which major currency will increase most (or decrease least) vs USD?<span class="ext" aria-hidden="true">↗</span></a></p>
-            <div class="foundation-subtitle">
-                Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
-            </div>
-	            <div class="question-box">
-	                <strong>Metaculus:</strong>
-	                <a href="https://www.metaculus.com/questions/41465/which-major-currency-will-increase-most-during-february-2026/" target="_blank" rel="noopener noreferrer">View question</a><br>
-	                <strong>Resolution:</strong> March 1, 2026 at 2 PM ET via Yahoo Finance Historical Data<br>
-	                <strong>Formula:</strong> <code>(Close_Feb27 − Close_Jan30) / Close_Jan30 × 100</code>
+	</head>
+	<body>
+	    <nav class="top-nav" aria-label="Primary">
+	        <div class="top-nav-inner">
+	            <div class="brand" aria-label="Site">
+	                <div class="brand-mark" aria-hidden="true"></div>
+	                <div>Bund &amp; Currency Trackers</div>
 	            </div>
-        </header>
 
-        <div class="top-panels">
-            <div class="panel-card" id="feedbackPanel">
-                <h3 class="panel-title" id="feedbackTitle">Feedback</h3>
-                <p class="panel-subtitle" id="feedbackSubtitle">
-                    Data quality issues? UI complaints? Wildly impractical feature suggestions? Tell us!<br><br>
+	            <div class="nav-tabs" role="navigation" aria-label="Pages">
+	                <a class="nav-tab active" href="february-2026-currency-tracker.html">Currency</a>
+	                <a class="nav-tab" href="german-bond-tracker.html">Bond</a>
+	            </div>
+
+	            <div class="nav-actions">
+	                <button class="nav-tab nav-btn" id="advancedBtn" type="button" aria-haspopup="menu" aria-expanded="false">View ▾</button>
+	                <div class="dropdown" id="advancedMenu" role="menu" hidden>
+	                    <div class="dropdown-title">View</div>
+	                    <button class="menu-item primary" type="button" data-advanced-toggle>Full dashboard</button>
+	                    <button class="menu-item" type="button" data-advanced-jump="performanceChartContainer">Daily performance <span class="menu-hint">↘</span></button>
+	                    <button class="menu-item" type="button" data-advanced-jump="verify">Verify &amp; sources <span class="menu-hint">↘</span></button>
+	                    <button class="menu-item" type="button" data-advanced-jump="dxy">1Y DXY + currencies <span class="menu-hint">↘</span></button>
+	                    <button class="menu-item" type="button" data-advanced-jump="monthlyWinnersContainer">Monthly winners <span class="menu-hint">↘</span></button>
+	                    <button class="menu-item" type="button" data-advanced-jump="comments">Feedback &amp; comments <span class="menu-hint">↘</span></button>
+	                </div>
+	            </div>
+	        </div>
+	    </nav>
+
+	    <div class="container">
+	        <header>
+	            <h1>🌍 February 2026 Currency Tracker</h1>
+		            <p class="subtitle"><a href="https://www.metaculus.com/questions/41465/which-major-currency-will-increase-most-during-february-2026/" target="_blank" rel="noopener noreferrer">Metaculus Question: Which major currency will increase most (or decrease least) vs USD?<span class="ext" aria-hidden="true">↗</span></a></p>
+	            <div class="foundation-subtitle">
+	                Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
+	            </div>
+		            <div class="question-box advanced-only">
+		                <strong>Metaculus:</strong>
+		                <a href="https://www.metaculus.com/questions/41465/which-major-currency-will-increase-most-during-february-2026/" target="_blank" rel="noopener noreferrer">View question</a><br>
+		                <strong>Resolution:</strong> March 1, 2026 at 2 PM ET via Yahoo Finance Historical Data<br>
+		                <strong>Formula:</strong> <code>(Close_Feb27 − Close_Jan30) / Close_Jan30 × 100</code>
+		            </div>
+	        </header>
+
+	        <div class="overview-row">
+	            <div id="leaderBanner" class="overview-card leader-card">
+	                <div class="overview-title">🏆 Current leader</div>
+	                <div class="overview-main" id="leaderCurrency">Loading…</div>
+	                <div class="leader-change" id="leaderChange">Loading…</div>
+	            </div>
+
+	            <div class="overview-card">
+	                <div class="overview-title">📌 Baseline → As-of</div>
+	                <div class="overview-sub"><span id="baselineDateLabel">Jan 30, 2026</span> → <span id="currentDateLabel">Loading…</span></div>
+	                <div class="overview-hint">Formula: <code>(Close_Feb27 − Close_Jan30) / Close_Jan30 × 100</code></div>
+	            </div>
+
+	            <div class="overview-card good">
+	                <div class="overview-title">✅ Data status</div>
+	                <div class="overview-sub">Yahoo Finance verified</div>
+	                <div class="overview-hint"><strong>Last refresh:</strong> <span id="lastUpdated" data-fallback="February 04, 2026 at 02:21 PM GMT" style="color:#4ade80; font-weight: 800;">Loading…</span></div>
+	            </div>
+	        </div>
+
+	        <div class="top-panels advanced-only" id="comments">
+	            <div class="panel-card" id="feedbackPanel">
+	                <h3 class="panel-title" id="feedbackTitle">Feedback</h3>
+	                <p class="panel-subtitle" id="feedbackSubtitle">
+	                    Data quality issues? UI complaints? Wildly impractical feature suggestions? Tell us!<br><br>
                     Private: this goes straight to the site owner and will not appear on the page.
                 </p>
 
@@ -532,16 +675,16 @@
                 </form>
             </div>
 
-            <div class="source-box">
-                <h3>✅ 100% Yahoo Finance Data</h3>
-                <p><strong>All values scraped directly from Yahoo Finance.</strong></p>
-                <p><strong>Baseline:</strong> January 30, 2026 (Friday close — Jan 31 was Saturday)</p>
-                <p><strong>Last Updated:</strong> <span id="lastUpdated" data-fallback="February 04, 2026 at 02:21 PM GMT" style="color:#4ade80; font-weight: bold;">Loading…</span></p>
-                <div class="download-row">
-                    <button class="download-btn" id="downloadSnapshotCsv" type="button">Download CSV (Snapshot)</button>
-                    <button class="download-btn secondary" id="downloadFebDailyCsv" type="button" disabled>Download CSV (Feb Daily)</button>
-                    <button class="download-btn secondary" id="downloadHistoryCsv" type="button" disabled>Download CSV (1Y + DXY)</button>
-                </div>
+	            <div class="source-box">
+	                <h3>✅ 100% Yahoo Finance Data</h3>
+	                <p><strong>All values scraped directly from Yahoo Finance.</strong></p>
+	                <p><strong>Baseline:</strong> January 30, 2026 (Friday close — Jan 31 was Saturday)</p>
+	                <p><strong>Last Updated:</strong> <span style="color:#4ade80; font-weight: bold;">Shown above</span></p>
+	                <div class="download-row">
+	                    <button class="download-btn" id="downloadSnapshotCsv" type="button">Download CSV (Snapshot)</button>
+	                    <button class="download-btn secondary" id="downloadFebDailyCsv" type="button" disabled>Download CSV (Feb Daily)</button>
+	                    <button class="download-btn secondary" id="downloadHistoryCsv" type="button" disabled>Download CSV (1Y + DXY)</button>
+	                </div>
             </div>
 
             <div class="panel-card" id="commentsPanel">
@@ -574,36 +717,21 @@
             </div>
         </div>
 
-        <div class="status-bar">
-            <div class="status-item">
-                <div class="status-dot"></div>
-                <span>Yahoo Finance Verified</span>
-            </div>
-            <div class="status-item">
-                <strong>Baseline:</strong>&nbsp;<span id="baselineDateLabel">Jan 30, 2026</span>
-            </div>
-            <div class="status-item">
-                <strong>Current:</strong>&nbsp;<span id="currentDateLabel">Loading…</span>
-            </div>
-        </div>
-
-        <div id="leaderBanner" class="leader-banner">
-            <div class="leader-label">🏆 CURRENT LEADER</div>
-            <div class="leader-currency" id="leaderCurrency"></div>
-            <div class="leader-change" id="leaderChange"></div>
-        </div>
-
-        <div id="currencyGrid" class="grid"></div>
+	        <div class="chart-container advanced-only" id="currencyCardsContainer">
+	            <h3 class="chart-title">🧾 Currency Cards</h3>
+	            <p class="chart-note">Baseline/current values and % change for each currency.</p>
+	            <div id="currencyGrid" class="grid"></div>
+	        </div>
 
         <div class="dashboard-row">
             <div class="chart-container">
                 <h3 class="chart-title">📊 February 2026 Performance Ranking (% Change from Baseline)</h3>
-                <div class="chart-wrapper">
+                <div class="chart-wrapper chart-big">
                     <canvas id="barChart"></canvas>
                 </div>
             </div>
 
-            <div class="chart-container" id="performanceChartContainer">
+            <div class="chart-container advanced-only" id="performanceChartContainer">
                 <h3 class="chart-title">📈 Daily Performance (% Change vs Baseline Close)</h3>
                 <p class="chart-note" id="performanceChartNote"></p>
                 <div class="chart-wrapper">
@@ -612,27 +740,27 @@
             </div>
         </div>
 
-        <div class="dashboard-row">
-            <div class="chart-container" id="dxyChartContainer">
-                <h3 class="chart-title">💵 1-Year USD Strength (DXY) vs Currencies</h3>
-                <p class="chart-note" id="dxyChartNote"></p>
-                <div class="chart-wrapper">
-                    <canvas id="dxyChart"></canvas>
-                </div>
-            </div>
+	            <div class="dashboard-row advanced-only" id="dxy">
+	            <div class="chart-container" id="dxyChartContainer">
+	                <h3 class="chart-title">💵 1-Year USD Strength (DXY) vs Currencies</h3>
+	                <p class="chart-note" id="dxyChartNote"></p>
+	                <div class="chart-wrapper">
+	                    <canvas id="dxyChart"></canvas>
+	                </div>
+	            </div>
 
-            <div class="chart-container" id="monthlyWinnersContainer">
-                <h3 class="chart-title">🗓️ Monthly FX Winners (2025–Jan 2026)</h3>
-                <p class="chart-note" id="monthlyWinnersNote">Loading…</p>
-                <div id="monthlyWinnersList" class="month-list"></div>
-            </div>
-        </div>
+	            <div class="chart-container" id="monthlyWinnersContainer">
+	                <h3 class="chart-title">🗓️ Monthly FX Winners (2025–Jan 2026)</h3>
+	                <p class="chart-note" id="monthlyWinnersNote">Loading…</p>
+	                <div id="monthlyWinnersList" class="month-list"></div>
+	            </div>
+	        </div>
 
-        <div class="chart-container">
-            <h3 class="chart-title">📋 Complete Data Table</h3>
-            <table class="data-table" id="dataTable">
-                <thead>
-                    <tr>
+	        <div class="chart-container advanced-only" id="verify">
+	            <h3 class="chart-title">📋 Complete Data Table</h3>
+	            <table class="data-table" id="dataTable">
+	                <thead>
+	                    <tr>
                         <th>Rank</th>
                         <th>Currency</th>
                         <th>Baseline (<span id="baselineDateLabelTable">Jan 30</span>)</th>
@@ -656,14 +784,14 @@
                     <a href="https://finance.yahoo.com/quote/CADUSD=X/history/" target="_blank">CAD/USD</a>
                     <a href="https://finance.yahoo.com/quote/MXNUSD=X/history/" target="_blank">MXN/USD</a>
                 </div>
-            </div>
-        </div>
+	            </div>
+	        </div>
 
-        <div class="info-section">
-            <h3>📖 How This Tracker Works</h3>
-            <p>This tracker monitors 8 major currencies against the US Dollar throughout February 2026.</p>
-            <div class="formula-box">
-                % Change = (Current_Price − Baseline_Price) / Baseline_Price × 100
+	        <div class="info-section advanced-only">
+	            <h3>📖 How This Tracker Works</h3>
+	            <p>This tracker monitors 8 major currencies against the US Dollar throughout February 2026.</p>
+	            <div class="formula-box">
+	                % Change = (Current_Price − Baseline_Price) / Baseline_Price × 100
             </div>
             <p><strong>Data Source:</strong> All values scraped directly from <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a> — the same source Metaculus will use for resolution.</p>
             <p><strong>Updates:</strong> Live via a Netlify Function (cached) — no redeploys required for new data.</p>
@@ -802,25 +930,93 @@
             return 'rank-other';
         }
 
-        function getChangeClass(change) {
-            if (change > 0.001) return 'positive';
-            if (change < -0.001) return 'negative';
-            return 'neutral';
-        }
+	        function getChangeClass(change) {
+	            if (change > 0.001) return 'positive';
+	            if (change < -0.001) return 'negative';
+	            return 'neutral';
+	        }
 
-        // Render functions
-        function renderLeader(results) {
-            const leader = results[0];
-            const isPositive = leader.change >= 0;
-            const banner = document.getElementById('leaderBanner');
-            banner.className = `leader-banner ${isPositive ? '' : 'negative'}`;
+	        function setAdvancedOpen(open) {
+	            const isOpen = Boolean(open);
+	            document.body.classList.toggle('advanced-open', isOpen);
+	            try { localStorage.setItem('sf_full_dashboard_v1', isOpen ? '1' : '0'); } catch {}
+	
+	            const toggleBtn = document.querySelector('[data-advanced-toggle]');
+	            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
+	
+	            if (isOpen) {
+	                requestAnimationFrame(() => {
+	                    try { if (dxyChartInstance && typeof dxyChartInstance.resize === 'function') dxyChartInstance.resize(); } catch {}
+	                });
+	            }
+	        }
+	
+	        function initAdvancedMenu() {
+	            const btn = document.getElementById('advancedBtn');
+	            const menu = document.getElementById('advancedMenu');
+	            if (!btn || !menu) return;
+	
+	            const stored = (() => {
+	                try { return localStorage.getItem('sf_full_dashboard_v1'); } catch { return null; }
+	            })();
+	            setAdvancedOpen(stored === '1');
+	
+	            function close() {
+	                menu.hidden = true;
+	                btn.setAttribute('aria-expanded', 'false');
+	            }
+	
+	            function open() {
+	                menu.hidden = false;
+	                btn.setAttribute('aria-expanded', 'true');
+	                const toggleBtn = menu.querySelector('[data-advanced-toggle]');
+	                if (toggleBtn) toggleBtn.textContent = document.body.classList.contains('advanced-open') ? 'Basic view' : 'Full dashboard';
+	            }
+	
+	            btn.addEventListener('click', (e) => {
+	                e.stopPropagation();
+	                if (menu.hidden) open(); else close();
+	            });
+	
+	            menu.addEventListener('click', (e) => {
+	                e.stopPropagation();
+	                const t = e.target;
+	                const toggle = t && t.closest ? t.closest('[data-advanced-toggle]') : null;
+	                if (toggle) {
+	                    setAdvancedOpen(!document.body.classList.contains('advanced-open'));
+	                    close();
+	                    return;
+	                }
+	
+	                const jump = t && t.closest ? t.closest('[data-advanced-jump]') : null;
+	                if (jump) {
+	                    const id = jump.getAttribute('data-advanced-jump');
+	                    setAdvancedOpen(true);
+	                    close();
+	                    requestAnimationFrame(() => {
+	                        const el = id ? document.getElementById(id) : null;
+	                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	                    });
+	                }
+	            });
+	
+	            document.addEventListener('click', () => close());
+	            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+	        }
+	
+	        // Render functions
+	        function renderLeader(results) {
+	            const leader = results[0];
+	            const isPositive = leader.change >= 0;
+	            const banner = document.getElementById('leaderBanner');
+	            if (banner) banner.className = `overview-card leader-card${isPositive ? '' : ' negative'}`;
 
-            document.getElementById('leaderCurrency').textContent =
-                `${CURRENCIES[leader.code].flag} ${leader.code} (${CURRENCIES[leader.code].name})`;
-            document.getElementById('leaderChange').textContent = formatPercent(leader.change);
-            document.getElementById('leaderChange').className =
-                `leader-change ${isPositive ? 'positive' : 'negative'}`;
-        }
+	            document.getElementById('leaderCurrency').textContent =
+	                `${CURRENCIES[leader.code].flag} ${leader.code} (${CURRENCIES[leader.code].name})`;
+	            document.getElementById('leaderChange').textContent = formatPercent(leader.change);
+	            document.getElementById('leaderChange').className =
+	                `leader-change ${isPositive ? 'positive' : 'negative'}`;
+	        }
 
         function renderCards(results) {
             const grid = document.getElementById('currencyGrid');
@@ -1611,12 +1807,14 @@
         }
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', async () => {
-            const snapshotBtn = document.getElementById('downloadSnapshotCsv');
-            if (snapshotBtn) {
-                snapshotBtn.addEventListener('click', () => {
-                    const results = calculateResults();
-                    downloadCsv(`currency_feb2026_snapshot_${ASOF_DATE}.csv`, buildSnapshotCsv(results));
+	        document.addEventListener('DOMContentLoaded', async () => {
+	            initAdvancedMenu();
+	
+	            const snapshotBtn = document.getElementById('downloadSnapshotCsv');
+	            if (snapshotBtn) {
+	                snapshotBtn.addEventListener('click', () => {
+	                    const results = calculateResults();
+	                    downloadCsv(`currency_feb2026_snapshot_${ASOF_DATE}.csv`, buildSnapshotCsv(results));
                 });
             }
 
