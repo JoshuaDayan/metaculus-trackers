@@ -935,7 +935,7 @@
 	        function setAdvancedOpen(open) {
 	            const isOpen = Boolean(open);
 	            document.body.classList.toggle('advanced-open', isOpen);
-	            try { localStorage.setItem('sf_advanced_open_v1', isOpen ? '1' : '0'); } catch {}
+	            try { localStorage.setItem('sf_full_dashboard_v1', isOpen ? '1' : '0'); } catch {}
 	
 	            const toggleBtn = document.querySelector('[data-advanced-toggle]');
 	            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
@@ -953,7 +953,7 @@
 	            if (!btn || !menu) return;
 	
 	            const stored = (() => {
-	                try { return localStorage.getItem('sf_advanced_open_v1'); } catch { return null; }
+	                try { return localStorage.getItem('sf_full_dashboard_v1'); } catch { return null; }
 	            })();
 	            setAdvancedOpen(stored === '1');
 	
