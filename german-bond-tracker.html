@@ -432,6 +432,7 @@
         .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
         .chart-note { color: #888; font-size: 0.85rem; margin-top: -12px; margin-bottom: 14px; }
         .chart-wrapper { position: relative; height: 260px; }
+        .chart-wrapper.chart-big { height: 420px; }
 
         /* Gauge */
         .gauge {
@@ -686,12 +687,13 @@
 	            </div>
 
 	            <div class="nav-actions">
-	                <button class="nav-tab nav-btn" id="advancedBtn" type="button" aria-haspopup="menu" aria-expanded="false">Advanced ▾</button>
+	                <button class="nav-tab nav-btn" id="advancedBtn" type="button" aria-haspopup="menu" aria-expanded="false">View ▾</button>
 	                <div class="dropdown" id="advancedMenu" role="menu" hidden>
-	                    <div class="dropdown-title">Advanced sections</div>
-	                    <button class="menu-item primary" type="button" data-advanced-toggle>Show advanced</button>
+	                    <div class="dropdown-title">View</div>
+	                    <button class="menu-item primary" type="button" data-advanced-toggle>Full dashboard</button>
 	                    <button class="menu-item" type="button" data-advanced-jump="verify">Verify &amp; sources <span class="menu-hint">↘</span></button>
 	                    <button class="menu-item" type="button" data-advanced-jump="monthlyHistoryCard">Monthly YES/NO <span class="menu-hint">↘</span></button>
+	                    <button class="menu-item" type="button" data-advanced-jump="comparisonChartContainer">1Y comparison <span class="menu-hint">↘</span></button>
 	                    <button class="menu-item" type="button" data-advanced-jump="comments">Feedback &amp; comments <span class="menu-hint">↘</span></button>
 	                </div>
 	            </div>
@@ -821,12 +823,12 @@
         <div class="dashboard-row">
             <div class="chart-container" id="yieldChartContainer">
                 <h3 class="chart-title">📈 Yield Over Time</h3>
-                <div class="chart-wrapper">
+                <div class="chart-wrapper chart-big">
                     <canvas id="yieldChart"></canvas>
                 </div>
             </div>
 
-            <div class="chart-container" id="comparisonChartContainer">
+            <div class="chart-container advanced-only" id="comparisonChartContainer">
                 <h3 class="chart-title">🌍 1-Year 10Y Yield Comparison</h3>
                 <p class="chart-note" id="comparisonChartNote">Loading…</p>
                 <div class="chart-wrapper">
@@ -1032,7 +1034,7 @@
 	            try { localStorage.setItem('sf_advanced_open_v1', isOpen ? '1' : '0'); } catch {}
 	
 	            const toggleBtn = document.querySelector('[data-advanced-toggle]');
-	            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Hide advanced' : 'Show advanced';
+	            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
 	        }
 	
 	        function initAdvancedMenu() {
@@ -1054,7 +1056,7 @@
 	                menu.hidden = false;
 	                btn.setAttribute('aria-expanded', 'true');
 	                const toggleBtn = menu.querySelector('[data-advanced-toggle]');
-	                if (toggleBtn) toggleBtn.textContent = document.body.classList.contains('advanced-open') ? 'Hide advanced' : 'Show advanced';
+	                if (toggleBtn) toggleBtn.textContent = document.body.classList.contains('advanced-open') ? 'Basic view' : 'Full dashboard';
 	            }
 	
 	            btn.addEventListener('click', (e) => {
