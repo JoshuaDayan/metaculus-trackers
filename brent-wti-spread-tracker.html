@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brent − WTI Spot Spread Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 30px 20px;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        /* Top nav (shared pattern) */
+        .top-nav {
+            position: sticky;
+            top: 16px;
+            z-index: 100;
+            margin: 0 auto 18px;
+            max-width: 1200px;
+        }
+
+        .top-nav-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 10px 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(10, 12, 26, 0.72);
+            backdrop-filter: blur(14px);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 900;
+            color: #e8eaf3;
+            letter-spacing: 0.2px;
+        }
+
+        .brand-mark {
+            width: 10px;
+            height: 24px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #00d4ff, #7b2cbf);
+        }
+
+        .nav-tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .nav-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.04);
+            color: #cfd6e6;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .nav-tab:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); }
+        .nav-tab.active {
+            background: rgba(0, 212, 255, 0.12);
+            border-color: rgba(0, 212, 255, 0.25);
+            color: #9ff0ff;
+        }
+
+        .nav-actions { position: relative; display: flex; align-items: center; gap: 10px; }
+        .nav-btn { appearance: none; }
+        .dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            min-width: 240px;
+            background: rgba(10, 12, 26, 0.98);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 14px;
+            padding: 10px;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+        }
+        .dropdown-title { color: #888; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; padding: 6px 8px 8px; }
+        .menu-item {
+            width: 100%;
+            padding: 10px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            color: #cfd6e6;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        .menu-item:hover { border-color: rgba(255,255,255,0.14); background: rgba(255,255,255,0.06); }
+        .menu-item.primary {
+            background: rgba(0, 212, 255, 0.12);
+            border-color: rgba(0, 212, 255, 0.25);
+            color: #9ff0ff;
+            font-weight: 900;
+        }
+        .menu-hint { color: #888; font-size: 0.75rem; margin-left: 8px; }
+
+        @media (max-width: 768px) {
+            .top-nav { top: 0; }
+            .top-nav-inner { flex-wrap: wrap; justify-content: center; }
+            .brand { width: 100%; justify-content: center; }
+            .nav-actions { width: 100%; justify-content: center; }
+            .dropdown { right: 50%; transform: translateX(50%); }
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 18px;
+            padding: 22px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
+        .subtitle a { color: #00d4ff; text-decoration: underline; text-underline-offset: 2px; }
+        .subtitle a:hover { text-decoration-thickness: 2px; }
+        .subtitle a .ext { font-size: 0.85em; opacity: 0.8; margin-left: 6px; }
+        .subtitle a:hover .ext { opacity: 1; }
+
+        .foundation-subtitle {
+            font-family: 'Cinzel', serif;
+            font-size: 0.75rem;
+            color: #b8860b;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, rgba(184, 134, 11, 0.1), rgba(218, 165, 32, 0.05));
+            border: 1px solid rgba(184, 134, 11, 0.3);
+            border-radius: 8px;
+            letter-spacing: 1px;
+            display: inline-block;
+        }
+
+        .advanced-only { display: none !important; }
+        body.advanced-open .advanced-only { display: block !important; }
+        body.advanced-open .dashboard-row.advanced-only { display: grid !important; }
+
+        .overview-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .overview-card {
+            background: rgba(255,255,255,0.04);
+            border-radius: 16px;
+            padding: 18px 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .overview-card.good {
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.10), rgba(34, 197, 94, 0.05));
+            border-color: rgba(74, 222, 128, 0.25);
+        }
+
+        .overview-card.warn {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(245, 158, 11, 0.06));
+            border-color: rgba(251, 191, 36, 0.3);
+        }
+
+        .overview-title { font-size: 0.85rem; color: #888; letter-spacing: 0.4px; margin-bottom: 6px; }
+        .overview-main { font-size: 2rem; font-weight: 900; margin-top: 2px; }
+        .overview-sub { font-size: 0.9rem; color: #cfd6e6; margin-top: 6px; line-height: 1.45; }
+        .overview-hint { font-size: 0.8rem; color: #888; margin-top: 8px; line-height: 1.4; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+        .chart-container {
+            background: rgba(255,255,255,0.04);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
+        .chart-note { color: #888; font-size: 0.85rem; margin-top: -12px; margin-bottom: 14px; }
+        .chart-wrapper { position: relative; height: 420px; }
+
+        .dashboard-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .dashboard-row .chart-container { margin-bottom: 0; }
+
+        .info-section {
+            margin-top: 30px;
+            padding: 25px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .info-section h3 { margin-bottom: 15px; color: #00d4ff; font-size: 1rem; }
+        .info-section p { color: #888; line-height: 1.7; margin-bottom: 12px; font-size: 0.9rem; }
+        .info-section a { color: #00d4ff; text-decoration: none; }
+        .info-section a:hover { text-decoration: underline; }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .data-table th, .data-table td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .data-table th {
+            background: rgba(255,255,255,0.04);
+            font-weight: 700;
+            color: #888;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.06);
+            color: #cfd6e6;
+            font-weight: 800;
+            font-size: 0.8rem;
+        }
+
+        .pill.ok { border-color: rgba(74, 222, 128, 0.35); background: rgba(74, 222, 128, 0.10); color: #b7ffcf; }
+        .pill.warn { border-color: rgba(251, 191, 36, 0.35); background: rgba(251, 191, 36, 0.10); color: #ffe4a6; }
+
+    </style>
+</head>
+<body>
+    <nav class="top-nav" aria-label="Primary">
+        <div class="top-nav-inner">
+            <div class="brand" aria-label="Site">
+                <div class="brand-mark" aria-hidden="true"></div>
+                <div>Bund &amp; Currency Trackers</div>
+            </div>
+
+            <div class="nav-tabs" role="navigation" aria-label="Pages">
+                <a class="nav-tab" href="february-2026-currency-tracker.html">Currency</a>
+                <a class="nav-tab" href="german-bond-tracker.html">Bond</a>
+                <a class="nav-tab active" href="brent-wti-spread-tracker.html">Oil</a>
+            </div>
+
+            <div class="nav-actions">
+                <button class="nav-tab nav-btn" id="advancedBtn" type="button" aria-haspopup="menu" aria-expanded="false">View ▾</button>
+                <div class="dropdown" id="advancedMenu" role="menu" hidden>
+                    <div class="dropdown-title">View</div>
+                    <button class="menu-item primary" type="button" data-advanced-toggle>Full dashboard</button>
+                    <button class="menu-item" type="button" data-advanced-jump="legsChartContainer">WTI &amp; Brent legs <span class="menu-hint">↘</span></button>
+                    <button class="menu-item" type="button" data-advanced-jump="basisTableContainer">Calibration basis <span class="menu-hint">↘</span></button>
+                    <button class="menu-item" type="button" data-advanced-jump="verify">Verify &amp; sources <span class="menu-hint">↘</span></button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>🛢️ Brent − WTI Spot Spread Tracker</h1>
+            <p class="subtitle">
+                <a href="https://www.metaculus.com/questions/41689/brent-minus-wti-on-mar-4-2026/" target="_blank" rel="noopener noreferrer">
+                    Metaculus Question: Brent − WTI spot spread on March 4, 2026 (EIA)
+                    <span class="ext" aria-hidden="true">↗</span>
+                </a>
+            </p>
+            <div class="foundation-subtitle">
+                Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
+            </div>
+        </header>
+
+        <div class="overview-row">
+            <div class="overview-card good">
+                <div class="overview-title">📌 Current calibrated spread (Brent − WTI)</div>
+                <div class="overview-main"><span id="spreadNow">Loading…</span></div>
+                <div class="overview-sub">
+                    Live futures spread: <span class="mono" id="spreadLive">Loading…</span>
+                </div>
+            </div>
+
+            <div class="overview-card">
+                <div class="overview-title">🏛️ Latest EIA spot spread</div>
+                <div class="overview-main"><span id="spreadEia">Loading…</span></div>
+                <div class="overview-sub">As-of: <span class="mono" id="eiaAsOf">Loading…</span></div>
+            </div>
+
+            <div class="overview-card warn" id="targetCard">
+                <div class="overview-title">🎯 Resolution target</div>
+                <div class="overview-sub"><span class="pill warn" id="targetStatus">PENDING</span></div>
+                <div class="overview-hint">
+                    Target date: <span class="mono">2026-03-04</span> • Interp deadline: <span class="mono">2026-03-14</span>
+                </div>
+                <div class="overview-hint"><strong>Last refresh:</strong> <span id="lastUpdated">Loading…</span></div>
+            </div>
+        </div>
+
+        <div class="chart-container" id="spreadChartContainer">
+            <h3 class="chart-title">📈 Calibrated spread over time</h3>
+            <p class="chart-note" id="spreadChartNote">Loading…</p>
+            <div class="chart-wrapper">
+                <canvas id="spreadChart"></canvas>
+            </div>
+        </div>
+
+        <div class="dashboard-row advanced-only" id="legsChartContainer">
+            <div class="chart-container">
+                <h3 class="chart-title">🧾 Calibrated spot legs (WTI &amp; Brent)</h3>
+                <p class="chart-note">Calibrated = live futures + smoothed basis (EWMA half-life 3 business days).</p>
+                <div class="chart-wrapper">
+                    <canvas id="legsChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container" id="basisTableContainer">
+                <h3 class="chart-title">🧪 Calibration basis (raw window)</h3>
+                <p class="chart-note">Raw basis = EIA spot − futures daily close (same date). Basis is smoothed via EWMA.</p>
+                <table class="data-table" id="basisTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>WTI raw basis</th>
+                            <th>Brent raw basis</th>
+                            <th>WTI (EIA / close)</th>
+                            <th>Brent (EIA / close)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="basisTableBody">
+                        <tr><td colspan="5">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="info-section advanced-only" id="verify">
+            <h3>✅ Data sources &amp; methodology</h3>
+            <p>
+                <strong>Ground truth / resolution source:</strong>
+                EIA daily spot prices (WTI “Cushing, Oklahoma” = <span class="mono">RWTC</span>, Brent “Europe” = <span class="mono">RBRTE</span>).
+            </p>
+            <p>
+                <strong>Live input:</strong> Yahoo Finance futures (<span class="mono">CL=F</span> and <span class="mono">BZ=F</span>).
+                Futures are <em>not</em> physical spot, so we apply a smoothed basis correction.
+            </p>
+            <p>
+                <strong>Calibration:</strong>
+                For each date <span class="mono">D</span>, compute <span class="mono">raw_basis[D] = EIA_spot[D] − futures_close[D]</span>.
+                Smooth with EWMA (half-life 3 business days): <span class="mono">smoothed[D] = α·raw[D] + λ·smoothed[D−1]</span>,
+                where <span class="mono">λ = 0.5^(1/3)</span> and <span class="mono">α = 1 − λ</span>.
+            </p>
+            <p>
+                <strong>Metaculus resolution:</strong> value is <span class="mono">EIA_Brent(2026-03-04) − EIA_WTI(2026-03-04)</span>.
+                If either is missing by <span class="mono">2026-03-14</span>, Metaculus linearly interpolates between the nearest surrounding days with both prices.
+            </p>
+            <p>
+                Verify on EIA:
+                <a href="https://api.eia.gov/v2/petroleum/pri/spt/data/" target="_blank" rel="noopener noreferrer">EIA API v2 endpoint</a>
+                · <a href="https://www.eia.gov/opendata/" target="_blank" rel="noopener noreferrer">Get an API key</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let spreadChart = null;
+        let legsChart = null;
+
+        function formatUsd(v) {
+            if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
+            return '$' + Number(v).toFixed(2);
+        }
+
+        function formatPct(v) {
+            if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
+            const n = Number(v);
+            return (n >= 0 ? '+' : '') + n.toFixed(2);
+        }
+
+        function formatShort(iso) {
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return iso;
+            return d.toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+        }
+
+        function setAdvancedOpen(open) {
+            const isOpen = Boolean(open);
+            document.body.classList.toggle('advanced-open', isOpen);
+            try { localStorage.setItem('sf_full_dashboard_v1', isOpen ? '1' : '0'); } catch {}
+
+            const toggleBtn = document.querySelector('[data-advanced-toggle]');
+            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
+
+            if (isOpen) {
+                requestAnimationFrame(() => {
+                    try { if (legsChart && typeof legsChart.resize === 'function') legsChart.resize(); } catch {}
+                });
+            }
+        }
+
+        function initViewMenu() {
+            const btn = document.getElementById('advancedBtn');
+            const menu = document.getElementById('advancedMenu');
+            if (!btn || !menu) return;
+
+            const stored = (() => {
+                try { return localStorage.getItem('sf_full_dashboard_v1'); } catch { return null; }
+            })();
+            setAdvancedOpen(stored === '1');
+
+            function close() {
+                menu.hidden = true;
+                btn.setAttribute('aria-expanded', 'false');
+            }
+
+            function open() {
+                menu.hidden = false;
+                btn.setAttribute('aria-expanded', 'true');
+                const toggleBtn = menu.querySelector('[data-advanced-toggle]');
+                if (toggleBtn) toggleBtn.textContent = document.body.classList.contains('advanced-open') ? 'Basic view' : 'Full dashboard';
+            }
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (menu.hidden) open(); else close();
+            });
+
+            menu.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const t = e.target;
+                const toggle = t && t.closest ? t.closest('[data-advanced-toggle]') : null;
+                if (toggle) {
+                    setAdvancedOpen(!document.body.classList.contains('advanced-open'));
+                    close();
+                    return;
+                }
+
+                const jump = t && t.closest ? t.closest('[data-advanced-jump]') : null;
+                if (jump) {
+                    const id = jump.getAttribute('data-advanced-jump');
+                    setAdvancedOpen(true);
+                    close();
+                    requestAnimationFrame(() => {
+                        const el = id ? document.getElementById(id) : null;
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                }
+            });
+
+            document.addEventListener('click', () => close());
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+        }
+
+        function renderSpreadChart(data) {
+            const container = document.getElementById('spreadChartContainer');
+            const noteEl = document.getElementById('spreadChartNote');
+            const canvas = document.getElementById('spreadChart');
+            if (!container || !canvas) return;
+
+            const series = data?.intraday?.calibrated?.spread || [];
+            const ts = data?.intraday?.timestamps || [];
+            if (!Array.isArray(series) || !Array.isArray(ts) || ts.length < 2 || series.length < 2) {
+                if (noteEl) noteEl.textContent = 'Not enough data to render chart yet.';
+                return;
+            }
+
+            const labels = ts.map(formatShort);
+            if (noteEl) {
+                noteEl.textContent = `Range: last ${data.intraday.rangeDays} days • Interval: ${data.intraday.interval}`;
+            }
+
+            const ctx = canvas.getContext('2d');
+            if (spreadChart) { spreadChart.destroy(); spreadChart = null; }
+
+            spreadChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Calibrated spread (USD/bbl)',
+                            data: series,
+                            borderColor: '#00d4ff',
+                            backgroundColor: 'rgba(0, 212, 255, 0.12)',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            tension: 0.25,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${formatUsd(ctx.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: (v) => '$' + Number(v).toFixed(2) }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderLegsChart(data) {
+            const canvas = document.getElementById('legsChart');
+            if (!canvas) return;
+
+            const ts = data?.intraday?.timestamps || [];
+            const wti = data?.intraday?.calibrated?.wti || [];
+            const brent = data?.intraday?.calibrated?.brent || [];
+            if (!Array.isArray(ts) || ts.length < 2) return;
+
+            const labels = ts.map(formatShort);
+            const ctx = canvas.getContext('2d');
+            if (legsChart) { legsChart.destroy(); legsChart = null; }
+
+            legsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'WTI (calibrated spot)', data: wti, borderColor: 'rgba(229, 231, 235, 0.85)', borderWidth: 2, pointRadius: 0, tension: 0.25 },
+                        { label: 'Brent (calibrated spot)', data: brent, borderColor: '#7b2cbf', borderWidth: 2.2, pointRadius: 0, tension: 0.25 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatUsd(ctx.parsed.y)}` } }
+                    },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#888', callback: (v) => '$' + Number(v).toFixed(2) } },
+                        x: { grid: { display: false }, ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } }
+                    }
+                }
+            });
+        }
+
+        function renderBasisTable(data) {
+            const body = document.getElementById('basisTableBody');
+            if (!body) return;
+            const wti = data?.basis?.raw?.wti || [];
+            const brent = data?.basis?.raw?.brent || [];
+            if (!Array.isArray(wti) || !Array.isArray(brent) || !wti.length || !brent.length) {
+                body.innerHTML = '<tr><td colspan="5">No basis data yet.</td></tr>';
+                return;
+            }
+
+            const byDate = {};
+            for (const r of wti) byDate[r.date] = { date: r.date, wti: r };
+            for (const r of brent) {
+                byDate[r.date] = byDate[r.date] || { date: r.date };
+                byDate[r.date].brent = r;
+            }
+
+            const rows = Object.keys(byDate).sort().reverse().map((d) => {
+                const row = byDate[d];
+                const w = row.wti;
+                const b = row.brent;
+                return `
+                    <tr>
+                        <td class="mono">${d}</td>
+                        <td class="mono">${w ? formatUsd(w.raw_basis) : '—'}</td>
+                        <td class="mono">${b ? formatUsd(b.raw_basis) : '—'}</td>
+                        <td class="mono">${w ? `${formatUsd(w.eia_spot)} / ${formatUsd(w.futures_settle)}` : '—'}</td>
+                        <td class="mono">${b ? `${formatUsd(b.eia_spot)} / ${formatUsd(b.futures_settle)}` : '—'}</td>
+                    </tr>
+                `;
+            });
+
+            body.innerHTML = rows.join('');
+        }
+
+        function setTargetStatus(resolution) {
+            const el = document.getElementById('targetStatus');
+            const card = document.getElementById('targetCard');
+            if (!el || !card) return;
+
+            const status = resolution?.status || 'pending';
+            if (status === 'exact') {
+                el.className = 'pill ok';
+                el.textContent = `EXACT: ${formatUsd(resolution.value)}`;
+                card.className = 'overview-card good';
+                return;
+            }
+            if (status === 'interpolated') {
+                el.className = 'pill ok';
+                el.textContent = `INTERP: ${formatUsd(resolution.value)}`;
+                card.className = 'overview-card good';
+                return;
+            }
+            if (status === 'unavailable') {
+                el.className = 'pill warn';
+                el.textContent = 'UNAVAILABLE';
+                card.className = 'overview-card warn';
+                return;
+            }
+            el.className = 'pill warn';
+            el.textContent = 'PENDING';
+            card.className = 'overview-card warn';
+        }
+
+        async function fetchAndRender() {
+            const lastUpdatedEl = document.getElementById('lastUpdated');
+            try {
+                const res = await fetch('/.netlify/functions/oil-calibrated', { cache: 'no-store' });
+                let data = null;
+                try { data = await res.json(); } catch {}
+                if (!res.ok) {
+                    const msg = data && (data.message || data.error) ? `${data.error || 'error'}: ${data.message || ''}` : `HTTP ${res.status}`;
+                    throw new Error(msg);
+                }
+
+                if (lastUpdatedEl) lastUpdatedEl.textContent = data.lastUpdated || '—';
+
+                const spreadNow = document.getElementById('spreadNow');
+                const spreadLive = document.getElementById('spreadLive');
+                const spreadEia = document.getElementById('spreadEia');
+                const eiaAsOf = document.getElementById('eiaAsOf');
+
+                if (spreadNow) spreadNow.textContent = formatUsd(data?.spread?.calibrated);
+                if (spreadLive) spreadLive.textContent = formatUsd(data?.spread?.live_futures);
+                if (spreadEia) spreadEia.textContent = formatUsd(data?.spread?.last_eia);
+                if (eiaAsOf) eiaAsOf.textContent = data?.spread?.last_eia_date || '—';
+
+                setTargetStatus(data?.metaculus?.resolution);
+
+                renderSpreadChart(data);
+                renderLegsChart(data);
+                renderBasisTable(data);
+            } catch (e) {
+                if (lastUpdatedEl) lastUpdatedEl.textContent = 'Unavailable (stale)';
+                const noteEl = document.getElementById('spreadChartNote');
+                if (noteEl) noteEl.textContent = `Live data fetch failed. ${e && e.message ? e.message : ''}`.trim();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            initViewMenu();
+            await fetchAndRender();
+        });
+    </script>
+</body>
+</html>
