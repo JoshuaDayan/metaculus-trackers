@@ -657,8 +657,12 @@
             const lastUpdatedEl = document.getElementById('lastUpdated');
             try {
                 const res = await fetch('/.netlify/functions/oil-calibrated', { cache: 'no-store' });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
+                let data = null;
+                try { data = await res.json(); } catch {}
+                if (!res.ok) {
+                    const msg = data && (data.message || data.error) ? `${data.error || 'error'}: ${data.message || ''}` : `HTTP ${res.status}`;
+                    throw new Error(msg);
+                }
 
                 if (lastUpdatedEl) lastUpdatedEl.textContent = data.lastUpdated || '—';
 
@@ -680,7 +684,7 @@
             } catch (e) {
                 if (lastUpdatedEl) lastUpdatedEl.textContent = 'Unavailable (stale)';
                 const noteEl = document.getElementById('spreadChartNote');
-                if (noteEl) noteEl.textContent = 'Live data fetch failed. Please refresh later.';
+                if (noteEl) noteEl.textContent = `Live data fetch failed. ${e && e.message ? e.message : ''}`.trim();
             }
         }
 
@@ -691,4 +695,3 @@
     </script>
 </body>
 </html>
-

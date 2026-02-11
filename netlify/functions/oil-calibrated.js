@@ -434,37 +434,43 @@ exports.handler = async () => {
     const mostRecentBasisDate = basisDates.length ? basisDates.at(-1) : null;
     const basisAgeDays = mostRecentBasisDate ? businessDaysBetween(mostRecentBasisDate, nowDateStr) : null;
 
-    // Intraday series (5d @ 5m) for the chart.
-    const [wtiIntra, brentIntra] = await Promise.all([
-      fetchYahooIntraday(YAHOO_SYMBOL_WTI, { days: INTRADAY_RANGE_DAYS, interval: INTRADAY_INTERVAL }),
-      fetchYahooIntraday(YAHOO_SYMBOL_BRENT, { days: INTRADAY_RANGE_DAYS, interval: INTRADAY_INTERVAL }),
-    ]);
-
-    const commonTs = Array.from(wtiIntra.byTs.keys())
-      .filter((ts) => brentIntra.byTs.has(ts))
-      .sort((a, b) => a - b);
-
+    // Intraday series (best-effort) for charts. If Yahoo rejects intraday ranges/intervals, still
+    // return the point-in-time calibrated values (page stays up).
     const intraday = {
+      available: false,
       interval: INTRADAY_INTERVAL,
       rangeDays: INTRADAY_RANGE_DAYS,
       timestamps: [],
       futures: { wti: [], brent: [] },
       calibrated: { wti: [], brent: [], spread: [] },
     };
+    try {
+      const [wtiIntra, brentIntra] = await Promise.all([
+        fetchYahooIntraday(YAHOO_SYMBOL_WTI, { days: INTRADAY_RANGE_DAYS, interval: INTRADAY_INTERVAL }),
+        fetchYahooIntraday(YAHOO_SYMBOL_BRENT, { days: INTRADAY_RANGE_DAYS, interval: INTRADAY_INTERVAL }),
+      ]);
 
-    const basisSpread = smoothedBasisBrent - smoothedBasisWti;
-    for (const ts of commonTs) {
-      const w = wtiIntra.byTs.get(ts);
-      const b = brentIntra.byTs.get(ts);
-      if (!Number.isFinite(w) || !Number.isFinite(b)) continue;
+      const commonTs = Array.from(wtiIntra.byTs.keys())
+        .filter((ts) => brentIntra.byTs.has(ts))
+        .sort((a, b) => a - b);
 
-      intraday.timestamps.push(new Date(ts * 1000).toISOString());
-      intraday.futures.wti.push(w);
-      intraday.futures.brent.push(b);
+      const basisSpread = smoothedBasisBrent - smoothedBasisWti;
+      for (const ts of commonTs) {
+        const w = wtiIntra.byTs.get(ts);
+        const b = brentIntra.byTs.get(ts);
+        if (!Number.isFinite(w) || !Number.isFinite(b)) continue;
 
-      intraday.calibrated.wti.push(round2(w + smoothedBasisWti));
-      intraday.calibrated.brent.push(round2(b + smoothedBasisBrent));
-      intraday.calibrated.spread.push(round2((b - w) + basisSpread));
+        intraday.timestamps.push(new Date(ts * 1000).toISOString());
+        intraday.futures.wti.push(w);
+        intraday.futures.brent.push(b);
+
+        intraday.calibrated.wti.push(round2(w + smoothedBasisWti));
+        intraday.calibrated.brent.push(round2(b + smoothedBasisBrent));
+        intraday.calibrated.spread.push(round2((b - w) + basisSpread));
+      }
+      intraday.available = intraday.timestamps.length >= 2;
+    } catch {
+      intraday.available = false;
     }
 
     const liveTs = wtiDaily.live.timestamp || brentDaily.live.timestamp || fetchedAt;
@@ -559,4 +565,3 @@ exports.handler = async () => {
     };
   }
 };
-
