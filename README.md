@@ -17,7 +17,7 @@ Responses are CDN-cached to keep costs low and avoid redeploying the site for ro
 
 ## Required environment variables
 
-- `EIA_API_KEY` (required for `oil-calibrated`): create a free key at EIA Open Data and set it in Netlify.
+- `EIA_API_KEY` (required for `oil-calibrated`): create a free key at EIA Open Data and set it in Netlify. If you use Deploy Previews, set it for both **Production** and **Deploy Previews** contexts.
 
 ## Rigorous checks (before pushing)
 
