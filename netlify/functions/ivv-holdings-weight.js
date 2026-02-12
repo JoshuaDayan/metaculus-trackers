@@ -9,6 +9,7 @@ const IVV_HOLDINGS_CSV_URL_TEMPLATE =
 const DEFAULT_BASKET_TICKERS = ["NVDA", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "AMD"];
 const DEFAULT_WINDOW_MONTHS = 6;
 const DEFAULT_FETCH_CONCURRENCY = 6;
+const DEFAULT_COARSE_STRIDE_DAYS = 5; // weekly-ish sampling for older history
 
 const DEFAULT_CDN_CACHE_SECONDS = 60 * 60; // 1 hour
 const DEFAULT_STALE_WHILE_REVALIDATE_SECONDS = 24 * 60 * 60; // 1 day
@@ -126,6 +127,10 @@ function parseHoldingsCsvForBasket(csvText, { basketTickers }) {
     return { available: false, holdingsAsOfLabel: null, weightByTicker: null, totalWeight: null };
   }
 
+  if (holdingsAsOfLabel.trim() === "-") {
+    return { available: false, holdingsAsOfLabel: holdingsAsOfLabel.trim(), weightByTicker: null, totalWeight: null };
+  }
+
   const lines = csvText.split(/\r?\n/);
   let header = null;
   let headerIdx = -1;
@@ -148,7 +153,6 @@ function parseHoldingsCsvForBasket(csvText, { basketTickers }) {
 
   const wanted = new Set(basketTickers.map((t) => t.toUpperCase()));
   const weightByTicker = {};
-  const seen = new Set();
 
   for (let i = headerIdx + 1; i < lines.length; i += 1) {
     const raw = lines[i];
@@ -169,20 +173,25 @@ function parseHoldingsCsvForBasket(csvText, { basketTickers }) {
     const weight = roundTo(parsed, 6);
 
     weightByTicker[ticker] = roundTo((weightByTicker[ticker] || 0) + weight, 6);
-    seen.add(ticker);
-    if (seen.size === wanted.size) break;
+    // We do not early-exit based on "seen" because duplicates can exist (e.g., multiple share classes);
+    // summing and finishing the file keeps behavior stable.
   }
 
-  const missing = basketTickers.filter((t) => weightByTicker[t.toUpperCase()] === undefined);
-  if (missing.length) {
-    throw new Error(`Missing tickers in holdings CSV: ${missing.join(", ")}`);
+  const missingTickers = basketTickers.filter((t) => weightByTicker[t.toUpperCase()] === undefined);
+  if (missingTickers.length === basketTickers.length) {
+    // If *none* of the basket tickers are present, treat this as a missing snapshot rather than
+    // returning a misleading 0% total weight.
+    return { available: false, holdingsAsOfLabel, weightByTicker: null, totalWeight: null };
+  }
+  for (const t of missingTickers) {
+    weightByTicker[t.toUpperCase()] = 0;
   }
 
   const totalWeight = roundTo(
     basketTickers.reduce((sum, t) => sum + (weightByTicker[t.toUpperCase()] || 0), 0),
     6
   );
-  return { available: true, holdingsAsOfLabel, weightByTicker, totalWeight };
+  return { available: true, holdingsAsOfLabel, weightByTicker, totalWeight, missingTickers };
 }
 
 async function fetchHoldingsCsvText(asOfDateParam) {
@@ -253,8 +262,11 @@ exports.handler = async (event) => {
     const lookbackDays = Number.isFinite(daysParam) ? Math.max(0, Math.min(730, Math.floor(daysParam))) : null;
     const lookbackMonths = Number.isFinite(monthsParam) ? Math.max(0, Math.min(24, Math.floor(monthsParam))) : DEFAULT_WINDOW_MONTHS;
 
-    const strideParam = typeof qs.stride === "string" ? Number(qs.stride) : 1;
-    const stride = Number.isFinite(strideParam) ? Math.max(1, Math.min(30, Math.floor(strideParam))) : 1;
+    const strideParamRaw = typeof qs.stride === "string" ? Number(qs.stride) : null;
+    const strideFromParam = Number.isFinite(strideParamRaw)
+      ? Math.max(1, Math.min(30, Math.floor(strideParamRaw)))
+      : null;
+    const stride = strideFromParam !== null ? strideFromParam : lookbackDays !== null ? 1 : DEFAULT_COARSE_STRIDE_DAYS;
 
     const concurrencyParam = typeof qs.concurrency === "string" ? Number(qs.concurrency) : null;
     const concurrency = Number.isFinite(concurrencyParam)
@@ -270,12 +282,34 @@ exports.handler = async (event) => {
       cur = addDays(cur, 1);
     }
 
-    const stridedDates = datesToQuery.filter((_, idx) => idx % stride === 0);
-    if (!stridedDates.length) {
+    if (!datesToQuery.length) {
       throw new Error("No weekday dates in requested window");
     }
 
-    const points = await mapWithConcurrency(stridedDates, concurrency, async (isoDate) => {
+    // Keep newer history dense (daily) and older history coarse (stride) to avoid
+    // fetching hundreds of iShares snapshots on a cold cache miss.
+    const yearStartIso = `${asOfLimit.getUTCFullYear()}-01-01`;
+
+    const selectedDatesSet = new Set();
+    let coarseIdx = 0;
+    for (const isoDate of datesToQuery) {
+      if (isoDate >= yearStartIso) {
+        selectedDatesSet.add(isoDate);
+      } else {
+        if (coarseIdx % stride === 0) selectedDatesSet.add(isoDate);
+        coarseIdx += 1;
+      }
+    }
+
+    // Always include the latest weekday we have in-range.
+    selectedDatesSet.add(datesToQuery[datesToQuery.length - 1]);
+
+    const selectedDates = Array.from(selectedDatesSet).sort();
+    if (!selectedDates.length) {
+      throw new Error("No weekday dates selected");
+    }
+
+    const points = await mapWithConcurrency(selectedDates, concurrency, async (isoDate) => {
       const dateObj = parseISODate(isoDate);
       if (!dateObj) return null;
       const asOfDateParam = toAsOfDateParam(dateObj);
@@ -283,18 +317,18 @@ exports.handler = async (event) => {
         const csvText = await fetchHoldingsCsvText(asOfDateParam);
         const parsed = parseHoldingsCsvForBasket(csvText, { basketTickers });
         if (!parsed.available) return null;
+
+        if (!Number.isFinite(parsed.totalWeight) || parsed.totalWeight < 0 || parsed.totalWeight > 100) return null;
+
         return {
           date: isoDate,
           holdingsAsOfLabel: parsed.holdingsAsOfLabel,
           weightByTicker: parsed.weightByTicker,
           totalWeight: parsed.totalWeight,
+          missingTickers: parsed.missingTickers || [],
         };
       } catch (err) {
-        // Skip missing/unavailable dates, but keep real parse errors visible.
-        const message = err instanceof Error ? err.message : String(err);
-        if (message.includes('Fund Holdings as of') || message.includes("Missing tickers")) {
-          throw err;
-        }
+        // Treat any per-date failure as a missing snapshot; we'll still serve older data if available.
         return null;
       }
     });
@@ -312,28 +346,65 @@ exports.handler = async (event) => {
     }
 
     const latest = seriesPoints[seriesPoints.length - 1];
+    const latestMissing = latest.missingTickers || [];
     const basket = {
       tickers: basketTickers,
       asOfDate: latest.date,
       holdingsAsOfLabel: latest.holdingsAsOfLabel,
       weights: latest.weightByTicker,
       totalWeight: latest.totalWeight,
+      missingTickers: latestMissing,
     };
 
     const targetParam = typeof qs.target === "string" ? qs.target : null;
-    const targetDateObj = targetParam && parseISODate(targetParam) ? parseISODate(targetParam) : null;
+    const targetDateObj = targetParam ? parseISODate(targetParam) : null;
     let target = null;
     if (targetDateObj) {
-      const asOfDateParam = toAsOfDateParam(targetDateObj);
-      const csvText = await fetchHoldingsCsvText(asOfDateParam);
-      const parsed = parseHoldingsCsvForBasket(csvText, { basketTickers });
-      target = {
-        date: toISODate(targetDateObj),
-        available: parsed.available,
-        holdingsAsOfLabel: parsed.holdingsAsOfLabel,
-        weights: parsed.weightByTicker,
-        totalWeight: parsed.totalWeight,
-      };
+      const targetIso = toISODate(targetDateObj);
+      const asOfLimitIso = toISODate(asOfLimit);
+
+      // If the target date is in the future (relative to asOfLimit), don't even attempt a fetch.
+      if (targetIso > asOfLimitIso) {
+        target = {
+          date: targetIso,
+          available: false,
+          holdingsAsOfLabel: null,
+          weights: null,
+          totalWeight: null,
+        };
+      } else {
+        const fromSeries = seriesPoints.find((p) => p.date === targetIso) || null;
+        if (fromSeries) {
+          target = {
+            date: targetIso,
+            available: true,
+            holdingsAsOfLabel: fromSeries.holdingsAsOfLabel,
+            weights: fromSeries.weightByTicker,
+            totalWeight: fromSeries.totalWeight,
+          };
+        } else {
+          try {
+            const asOfDateParam = toAsOfDateParam(targetDateObj);
+            const csvText = await fetchHoldingsCsvText(asOfDateParam);
+            const parsed = parseHoldingsCsvForBasket(csvText, { basketTickers });
+            target = {
+              date: targetIso,
+              available: parsed.available,
+              holdingsAsOfLabel: parsed.holdingsAsOfLabel,
+              weights: parsed.weightByTicker,
+              totalWeight: parsed.totalWeight,
+            };
+          } catch (_) {
+            target = {
+              date: targetIso,
+              available: false,
+              holdingsAsOfLabel: null,
+              weights: null,
+              totalWeight: null,
+            };
+          }
+        }
+      }
     }
 
     const body = {
@@ -346,6 +417,12 @@ exports.handler = async (event) => {
       basket,
       series: { dates, total, byTicker },
       target,
+      sampling: {
+        denseFrom: yearStartIso,
+        coarseStrideDays: stride,
+        selectedDates: selectedDates.length,
+        snapshots: seriesPoints.length,
+      },
       source: {
         provider: "iShares / BlackRock",
         format: "csv",

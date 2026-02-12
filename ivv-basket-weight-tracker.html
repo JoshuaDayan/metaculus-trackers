@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IVV Basket Weight Tracker | Metaculus</title>
+    <title>AI Companies Weight Tracker | Metaculus</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -93,10 +93,48 @@
             color: #9ff0ff;
         }
 
+        .nav-actions { position: relative; display: flex; align-items: center; gap: 10px; }
+        .nav-btn { appearance: none; }
+        .dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            min-width: 240px;
+            background: rgba(10, 12, 26, 0.98);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 14px;
+            padding: 10px;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+        }
+        .dropdown-title { color: #888; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; padding: 6px 8px 8px; }
+        .dropdown-subtitle { color: #888; font-size: 0.78rem; padding: 0 8px 10px; line-height: 1.35; }
+        .menu-item {
+            width: 100%;
+            padding: 10px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            color: #cfd6e6;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        .menu-item:hover { border-color: rgba(255,255,255,0.14); background: rgba(255,255,255,0.06); }
+        .menu-item.primary {
+            background: rgba(0, 212, 255, 0.12);
+            border-color: rgba(0, 212, 255, 0.25);
+            color: #9ff0ff;
+            font-weight: 900;
+        }
+        .menu-hint { color: #888; font-size: 0.75rem; margin-left: 8px; }
+
         @media (max-width: 768px) {
             .top-nav { top: 0; }
             .top-nav-inner { flex-wrap: wrap; justify-content: center; }
             .brand { width: 100%; justify-content: center; }
+            .nav-actions { width: 100%; justify-content: center; }
+            .dropdown { right: 50%; transform: translateX(50%); }
         }
 
         header {
@@ -117,8 +155,42 @@
             background-clip: text;
         }
 
-        .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 8px; }
+        .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
         .subtitle a { color: #00d4ff; text-decoration: underline; text-underline-offset: 2px; }
+        .subtitle a:hover { text-decoration-thickness: 2px; }
+        .subtitle a .ext { font-size: 0.85em; opacity: 0.8; margin-left: 6px; }
+        .subtitle a:hover .ext { opacity: 1; }
+
+        .foundation-subtitle {
+            font-family: 'Cinzel', serif;
+            font-size: 0.75rem;
+            color: #b8860b;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, rgba(184, 134, 11, 0.1), rgba(218, 165, 32, 0.05));
+            border: 1px solid rgba(184, 134, 11, 0.3);
+            border-radius: 8px;
+            letter-spacing: 1px;
+            display: inline-block;
+        }
+
+        .question-box {
+            background: rgba(123, 44, 191, 0.1);
+            border: 1px solid rgba(123, 44, 191, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #ccc;
+            text-align: left;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 860px;
+        }
+
+        .question-box strong { color: #00d4ff; }
+        .question-box a { color: #00d4ff; text-decoration: none; }
+        .question-box a:hover { text-decoration: underline; }
 
         .meta {
             display: flex;
@@ -163,13 +235,16 @@
 
         .row {
             display: grid;
-            grid-template-columns: 1.35fr 0.65fr;
+            grid-template-columns: 1fr;
             gap: 14px;
             align-items: start;
         }
 
+        body.advanced-open .row { grid-template-columns: 1.35fr 0.65fr; }
+
         @media (max-width: 1100px) {
             .row { grid-template-columns: 1fr; }
+            body.advanced-open .row { grid-template-columns: 1fr; }
         }
 
         .panel {
@@ -192,7 +267,7 @@
         .note { color: #888; font-size: 0.82rem; margin-top: 8px; }
 
         .btns { display: inline-flex; gap: 8px; flex-wrap: wrap; }
-        button {
+        .btns button {
             appearance: none;
             border: 1px solid rgba(255,255,255,0.12);
             background: rgba(0,0,0,0.20);
@@ -204,11 +279,14 @@
             cursor: pointer;
             transition: all 0.15s ease;
         }
-        button:hover { transform: translateY(-1px); background: rgba(255,255,255,0.06); }
-        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btns button:hover { transform: translateY(-1px); background: rgba(255,255,255,0.06); }
+        .btns button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
         .chart-wrap { height: 360px; }
         canvas { width: 100% !important; height: 100% !important; }
+
+        .advanced-only { display: none !important; }
+        body.advanced-open .advanced-only { display: block !important; }
 
         table {
             width: 100%;
@@ -246,28 +324,54 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <nav class="top-nav" aria-label="Top navigation">
-            <div class="top-nav-inner">
-                <a class="brand" href="/" title="Metaculus Trackers">
-                    <span class="brand-mark" aria-hidden="true"></span>
-                    Metaculus Trackers
-                </a>
-                <div class="nav-tabs" role="navigation" aria-label="Pages">
-                    <a class="nav-tab" href="february-2026-currency-tracker.html">Currency</a>
-                    <a class="nav-tab" href="german-bond-tracker.html">Bond</a>
-                    <a class="nav-tab" href="brent-wti-spread-tracker.html">Oil</a>
-                    <a class="nav-tab active" href="ivv-basket-weight-tracker.html">IVV Basket</a>
+    <nav class="top-nav" aria-label="Primary">
+        <div class="top-nav-inner">
+            <div class="brand" aria-label="Site">
+                <div class="brand-mark" aria-hidden="true"></div>
+                <div>Bund &amp; Currency Trackers</div>
+            </div>
+
+            <div class="nav-tabs" role="navigation" aria-label="Pages">
+                <a class="nav-tab" href="february-2026-currency-tracker.html">Currency</a>
+                <a class="nav-tab" href="german-bond-tracker.html">Bond</a>
+                <a class="nav-tab" href="brent-wti-spread-tracker.html">Oil</a>
+                <a class="nav-tab active" href="ivv-basket-weight-tracker.html">IVV Basket</a>
+            </div>
+
+            <div class="nav-actions">
+                <button class="nav-tab nav-btn" id="advancedBtn" type="button" aria-haspopup="menu" aria-expanded="false">View ▾</button>
+                <div class="dropdown" id="advancedMenu" role="menu" hidden>
+                    <div class="dropdown-title">View</div>
+                    <div class="dropdown-subtitle">Basic = headline + history chart. Full = weights, projection, sources (remembers your choice).</div>
+                    <button class="menu-item primary" type="button" data-advanced-toggle>Full dashboard</button>
+                    <button class="menu-item" type="button" data-advanced-jump="weightsPanel">Latest weights <span class="menu-hint">↘</span></button>
+                    <button class="menu-item" type="button" data-advanced-jump="projectionPanel">Projections <span class="menu-hint">↘</span></button>
+                    <button class="menu-item" type="button" data-advanced-jump="verify">Wordcel comment <span class="menu-hint">↘</span></button>
                 </div>
             </div>
-        </nav>
+        </div>
+    </nav>
+
+    <div class="container">
 
         <header>
-            <h1>IVV Basket Weight Tracker</h1>
-            <div class="subtitle">
-                Live holdings from
+            <h1>📈 AI Companies’ S&amp;P 500 Weight Tracker</h1>
+            <p class="subtitle">
+                <a href="https://www.metaculus.com/questions/41341/ai-companies-sp-500-weight-on-feb-27-2026/" target="_blank" rel="noopener noreferrer">
+                    Metaculus Question: AI companies’ S&amp;P 500 weight on Feb 27, 2026
+                    <span class="ext" aria-hidden="true">↗</span>
+                </a>
+            </p>
+            <div class="foundation-subtitle">
+                Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
+            </div>
+
+            <div class="question-box advanced-only">
+                <strong>Data:</strong> iShares IVV holdings CSV (<code>Weight (%)</code>)<br>
+                <strong>Basket:</strong> <code>NVDA</code>, <code>MSFT</code>, <code>GOOGL</code>, <code>GOOG</code>, <code>AMZN</code>, <code>META</code>, <code>AMD</code><br>
+                <strong>Source:</strong>
                 <a href="https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf" target="_blank" rel="noopener noreferrer">
-                    iShares Core S&amp;P 500 ETF (IVV)
+                    iShares Core S&amp;P 500 ETF (IVV) <span class="ext" aria-hidden="true">↗</span>
                 </a>
             </div>
             <div class="meta">
@@ -312,7 +416,7 @@
                 <div class="note" id="historyNote"></div>
             </div>
 
-            <div class="panel">
+            <div class="panel advanced-only" id="weightsPanel">
                 <div class="panel-header">
                     <h2>Latest weights</h2>
                 </div>
@@ -331,7 +435,7 @@
             </div>
         </section>
 
-        <section class="panel" style="margin-top: 14px;">
+        <section class="panel advanced-only" id="projectionPanel" style="margin-top: 14px;">
             <div class="panel-header">
                 <h2>Projections to resolution</h2>
                 <div class="select">
@@ -348,6 +452,22 @@
             </div>
             <div class="note muted" id="projectionNote">
                 Projections are naive and for visualization only (not investment advice).
+            </div>
+        </section>
+
+        <section class="panel advanced-only" id="verify" style="margin-top: 14px;">
+            <div class="panel-header">
+                <h2>Wordcel Statistician’s Comment</h2>
+            </div>
+            <div class="note">
+                This tracker sums the basket’s <code>Weight (%)</code> from the daily iShares IVV holdings CSV snapshot.
+                If a ticker is missing on a given day, it is treated as <code>0</code>; if <em>none</em> of the basket tickers appear,
+                that date is skipped as “not available”.
+            </div>
+            <div class="note" id="samplingNote"></div>
+            <div class="note">
+                Want to verify manually? Download IVV holdings and check the <code>Weight (%)</code> column:
+                <a href="https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf" target="_blank" rel="noopener noreferrer">iShares IVV ↗</a>
             </div>
         </section>
     </div>
@@ -589,6 +709,80 @@
         let historyChart = null;
         let projectionChart = null;
         let DATA = null;
+
+        function setAdvancedOpen(open) {
+            const isOpen = Boolean(open);
+            document.body.classList.toggle('advanced-open', isOpen);
+            try { localStorage.setItem('sf_full_dashboard_v1', isOpen ? '1' : '0'); } catch {}
+
+            const toggleBtn = document.querySelector('[data-advanced-toggle]');
+            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
+
+            if (isOpen) {
+                requestAnimationFrame(() => {
+                    try { if (historyChart && typeof historyChart.resize === 'function') historyChart.resize(); } catch {}
+                    try { if (projectionChart && typeof projectionChart.resize === 'function') projectionChart.resize(); } catch {}
+                });
+
+                if (!projectionChart && DATA) {
+                    const modelSelect = document.getElementById('projectionModel');
+                    renderProjectionChart(modelSelect ? modelSelect.value : 'linear');
+                }
+            }
+        }
+
+        function initAdvancedMenu() {
+            const btn = document.getElementById('advancedBtn');
+            const menu = document.getElementById('advancedMenu');
+            if (!btn || !menu) return;
+
+            const stored = (() => {
+                try { return localStorage.getItem('sf_full_dashboard_v1'); } catch { return null; }
+            })();
+            setAdvancedOpen(stored === '1');
+
+            function close() {
+                menu.hidden = true;
+                btn.setAttribute('aria-expanded', 'false');
+            }
+
+            function open() {
+                menu.hidden = false;
+                btn.setAttribute('aria-expanded', 'true');
+                const toggleBtn = menu.querySelector('[data-advanced-toggle]');
+                if (toggleBtn) toggleBtn.textContent = document.body.classList.contains('advanced-open') ? 'Basic view' : 'Full dashboard';
+            }
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (menu.hidden) open(); else close();
+            });
+
+            menu.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const t = e.target;
+                const toggle = t && t.closest ? t.closest('[data-advanced-toggle]') : null;
+                if (toggle) {
+                    setAdvancedOpen(!document.body.classList.contains('advanced-open'));
+                    close();
+                    return;
+                }
+
+                const jump = t && t.closest ? t.closest('[data-advanced-jump]') : null;
+                if (jump) {
+                    const id = jump.getAttribute('data-advanced-jump');
+                    setAdvancedOpen(true);
+                    close();
+                    requestAnimationFrame(() => {
+                        const el = id ? document.getElementById(id) : null;
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                }
+            });
+
+            document.addEventListener('click', () => close());
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+        }
 
         function renderWeightsTable({ tickers, weights }) {
             const body = document.getElementById('weightsTableBody');
@@ -901,6 +1095,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
+            initAdvancedMenu();
             document.getElementById('resolutionDatePill').textContent = RESOLUTION_DATE;
             document.getElementById('periodStartPill').textContent = QUESTION_PERIOD_START;
 
@@ -917,7 +1112,16 @@
                 renderWeightsTable({ tickers: DATA.basket.tickers, weights: DATA.basket.weights });
                 renderHistoryChart();
                 setCards();
-                renderProjectionChart(modelSelect ? modelSelect.value : 'linear');
+                if (document.body.classList.contains('advanced-open')) {
+                    renderProjectionChart(modelSelect ? modelSelect.value : 'linear');
+                }
+
+                const samplingNote = document.getElementById('samplingNote');
+                if (samplingNote && DATA?.sampling) {
+                    const denseFrom = DATA.sampling.denseFrom;
+                    const strideDays = DATA.sampling.coarseStrideDays;
+                    samplingNote.textContent = `Sampling note: for performance, history is daily from ${denseFrom} onward; older dates may be downsampled (≈ every ${strideDays} weekdays).`;
+                }
 
                 if (dlBtn) {
                     dlBtn.disabled = false;
@@ -939,6 +1143,7 @@
             if (modelSelect) {
                 modelSelect.addEventListener('change', () => {
                     if (!DATA) return;
+                    if (!document.body.classList.contains('advanced-open')) return;
                     renderProjectionChart(modelSelect.value);
                 });
             }

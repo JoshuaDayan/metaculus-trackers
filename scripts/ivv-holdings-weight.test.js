@@ -85,6 +85,56 @@ test("ivv-holdings-weight returns basket + series for available dates", async ()
   }
 });
 
+test("ivv-holdings-weight treats missing tickers as 0 (but keeps snapshot)", async () => {
+  const originalFetch = global.fetch;
+  try {
+    const fixturesByAsOf = {
+      20260211: makeHoldingsCsv({
+        asOfLabel: "Feb 11, 2026",
+        rows: [{ ticker: "NVDA", weight: "7.78" }],
+      }),
+    };
+
+    global.fetch = async (url) => {
+      const m = String(url).match(/asOfDate=(\d{8})/);
+      assert.ok(m, `unexpected iShares url: ${url}`);
+      const asOf = Number(m[1]);
+      const body = fixturesByAsOf[asOf] || makeHoldingsCsv({ asOfLabel: "-", rows: [] });
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        text: async () => body,
+      };
+    };
+
+    const fn = require("../netlify/functions/ivv-holdings-weight");
+    const res = await fn.handler(
+      {
+        queryStringParameters: {
+          asof: "2026-02-11",
+          days: "0",
+          tickers: "NVDA,MSFT",
+        },
+      },
+      {}
+    );
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.basket.totalWeight, 7.78);
+    assert.deepEqual(body.basket.missingTickers, ["MSFT"]);
+    assert.equal(body.basket.weights.NVDA, 7.78);
+    assert.equal(body.basket.weights.MSFT, 0);
+
+    assert.deepEqual(body.series.dates, ["2026-02-11"]);
+    assert.deepEqual(body.series.byTicker.NVDA, [7.78]);
+    assert.deepEqual(body.series.byTicker.MSFT, [0]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("ivv-holdings-weight includes target when provided (available=false)", async () => {
   const originalFetch = global.fetch;
   try {
@@ -134,4 +184,3 @@ test("ivv-holdings-weight includes target when provided (available=false)", asyn
     global.fetch = originalFetch;
   }
 });
-
