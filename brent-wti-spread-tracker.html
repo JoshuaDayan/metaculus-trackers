@@ -284,9 +284,9 @@
 
             <div class="nav-actions">
                 <button class="nav-tab nav-btn" id="advancedBtn" type="button" aria-haspopup="menu" aria-expanded="false">View ▾</button>
-                <div class="dropdown" id="advancedMenu" role="menu" hidden>
+                    <div class="dropdown" id="advancedMenu" role="menu" hidden>
                     <div class="dropdown-title">View</div>
-                    <div class="dropdown-subtitle">Basic = headline + YTD spread. Full = legs, basis window, sources.</div>
+                    <div class="dropdown-subtitle">Basic = headline + spread chart. Full = legs, basis window, sources (remembers your choice).</div>
                     <button class="menu-item primary" type="button" data-advanced-toggle>Full dashboard</button>
                     <button class="menu-item" type="button" data-advanced-jump="legsChartContainer">WTI &amp; Brent legs <span class="menu-hint">↘</span></button>
                     <button class="menu-item" type="button" data-advanced-jump="basisTableContainer">Calibration basis <span class="menu-hint">↘</span></button>
@@ -342,6 +342,10 @@
                 <div class="chart-wrapper">
                     <canvas id="legsChart"></canvas>
                 </div>
+                <p class="chart-note">Visual: raw basis window (dashed = today’s smoothed basis).</p>
+                <div class="mini-chart-wrapper">
+                    <canvas id="basisChart"></canvas>
+                </div>
             </div>
 
             <div class="chart-container" id="basisTableContainer">
@@ -368,10 +372,6 @@
                         <tr><td colspan="5">Loading…</td></tr>
                     </tbody>
                 </table>
-                <p class="chart-note">Visual: raw basis window (dashed = today’s smoothed basis).</p>
-                <div class="mini-chart-wrapper">
-                    <canvas id="basisChart"></canvas>
-                </div>
             </div>
         </div>
 
@@ -406,39 +406,6 @@
         let spreadChart = null;
         let legsChart = null;
         let basisChart = null;
-
-        const periodMarkerPlugin = {
-            id: 'periodMarker',
-            afterDraw(chart, _args, opts) {
-                const index = opts && Number.isFinite(opts.index) ? opts.index : null;
-                if (index === null) return;
-                const xScale = chart.scales && chart.scales.x;
-                const yScale = chart.scales && chart.scales.y;
-                if (!xScale || !yScale || typeof xScale.getPixelForTick !== 'function') return;
-
-                const x = xScale.getPixelForTick(index);
-                const ctx = chart.ctx;
-                ctx.save();
-                ctx.setLineDash([6, 6]);
-                ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(x, yScale.top);
-                ctx.lineTo(x, yScale.bottom);
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                const label = opts && typeof opts.label === 'string' ? opts.label : '';
-                if (label) {
-                    ctx.fillStyle = 'rgba(255,255,255,0.70)';
-                    ctx.font = '12px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-                    ctx.textAlign = 'left';
-                    ctx.textBaseline = 'top';
-                    ctx.fillText(label, x + 6, yScale.top + 6);
-                }
-                ctx.restore();
-            }
-        };
 
         function formatUsd(v) {
             if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
@@ -575,18 +542,12 @@
             }
 
             const labels = ts.map(formatShort);
-            let periodIndex = null;
-            if (typeof periodStart === 'string' && periodStart.length === 10) {
-                const idx = ts.findIndex((iso) => typeof iso === 'string' && iso.slice(0, 10) >= periodStart);
-                if (idx >= 0) periodIndex = idx;
-            }
 
             if (noteEl) {
                 const startIso = ts[0];
                 const endIso = ts[ts.length - 1];
                 const interval = data?.intraday?.interval || '—';
-                const dottedLabel = periodStart ? ` • Dotted line: ${formatDay(periodStart)}` : '';
-                noteEl.textContent = `Range: ${formatShort(startIso)} → ${formatShort(endIso)} • Interval: ${interval}${dottedLabel}`;
+                noteEl.textContent = `Range: ${formatShort(startIso)} → ${formatShort(endIso)} • Interval: ${interval}`;
             }
 
             const ctx = canvas.getContext('2d');
@@ -594,7 +555,6 @@
 
             spreadChart = new Chart(ctx, {
                 type: 'line',
-                plugins: [periodMarkerPlugin],
                 data: {
                     labels,
                     datasets: [
@@ -616,7 +576,6 @@
                     maintainAspectRatio: false,
                     interaction: { mode: 'nearest', intersect: false },
                     plugins: {
-                        periodMarker: { index: periodIndex, label: periodStart ? `Period start (${formatDay(periodStart)})` : '' },
                         legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
                         tooltip: {
                             callbacks: {
