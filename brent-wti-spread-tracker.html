@@ -161,6 +161,24 @@
             display: inline-block;
         }
 
+        .question-box {
+            background: rgba(123, 44, 191, 0.1);
+            border: 1px solid rgba(123, 44, 191, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #ccc;
+            text-align: left;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 860px;
+        }
+
+        .question-box strong { color: #00d4ff; }
+        .question-box a { color: #00d4ff; text-decoration: none; }
+        .question-box a:hover { text-decoration: underline; }
+
         .advanced-only { display: none !important; }
         body.advanced-open .advanced-only { display: block !important; }
         body.advanced-open .dashboard-row.advanced-only { display: grid !important; }
@@ -279,11 +297,12 @@
                 <div>Bund &amp; Currency Trackers</div>
             </div>
 
-            <div class="nav-tabs" role="navigation" aria-label="Pages">
-                <a class="nav-tab" href="february-2026-currency-tracker.html">Currency</a>
-                <a class="nav-tab" href="german-bond-tracker.html">Bond</a>
-                <a class="nav-tab active" href="brent-wti-spread-tracker.html">Oil</a>
-            </div>
+	            <div class="nav-tabs" role="navigation" aria-label="Pages">
+	                <a class="nav-tab" href="february-2026-currency-tracker.html">Currency</a>
+	                <a class="nav-tab" href="german-bond-tracker.html">Bond</a>
+	                <a class="nav-tab active" href="brent-wti-spread-tracker.html">Oil</a>
+	                <a class="nav-tab" href="ivv-basket-weight-tracker.html">IVV Basket</a>
+	            </div>
 
             <div class="nav-actions">
                 <button class="nav-tab nav-btn" id="advancedBtn" type="button" aria-haspopup="menu" aria-expanded="false">View ▾</button>
@@ -311,6 +330,12 @@
             <div class="foundation-subtitle">
                 Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
             </div>
+
+	            <div class="question-box advanced-only">
+	                <strong>Resolution:</strong> EIA spot spread on Mar 4, 2026 (interpolate if missing by Mar 14).<br>
+	                <strong>Formula:</strong> <code>Spread (USD/bbl) = Brent_spot − WTI_spot</code><br>
+	                <strong>Calibration (this page):</strong> <code>Calibrated ≈ Yahoo futures + EWMA(basis)</code>, where <code>basis = EIA spot − Yahoo futures close</code>.
+	            </div>
         </header>
 
         <div class="overview-row">

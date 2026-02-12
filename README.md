@@ -7,11 +7,13 @@ The tracker pages are static files:
 - `february-2026-currency-tracker.html`
 - `german-bond-tracker.html`
 - `brent-wti-spread-tracker.html`
+- `ivv-basket-weight-tracker.html`
 
 They fetch fresh data at runtime from same-origin endpoints:
 - `/.netlify/functions/fx-tracker` (Yahoo Finance daily **Close** values)
 - `/.netlify/functions/bond-yield` (Deutsche Bundesbank series)
 - `/.netlify/functions/oil-calibrated` (EIA spot ground truth + Yahoo futures for calibrated intraday estimates)
+- `/.netlify/functions/ivv-holdings-weight` (iShares IVV holdings CSV; basket weights)
 
 Responses are CDN-cached to keep costs low and avoid redeploying the site for routine data updates.
 
