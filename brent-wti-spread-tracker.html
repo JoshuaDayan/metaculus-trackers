@@ -205,6 +205,7 @@
         .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
         .chart-note { color: #888; font-size: 0.85rem; margin-top: -12px; margin-bottom: 14px; }
         .chart-wrapper { position: relative; height: 420px; }
+        .mini-chart-wrapper { position: relative; height: 240px; margin-top: 14px; }
 
         .dashboard-row {
             display: grid;
@@ -367,6 +368,10 @@
                         <tr><td colspan="5">Loading…</td></tr>
                     </tbody>
                 </table>
+                <p class="chart-note">Visual: raw basis window (dashed = today’s smoothed basis).</p>
+                <div class="mini-chart-wrapper">
+                    <canvas id="basisChart"></canvas>
+                </div>
             </div>
         </div>
 
@@ -392,8 +397,7 @@
             </p>
             <p>
                 Verify on EIA:
-                <a href="https://api.eia.gov/v2/petroleum/pri/spt/data/" target="_blank" rel="noopener noreferrer">EIA API v2 endpoint</a>
-                · <a href="https://www.eia.gov/opendata/" target="_blank" rel="noopener noreferrer">Get an API key</a>
+                <a href="https://www.eia.gov/dnav/pet/pet_pri_spt_s1_d.htm" target="_blank" rel="noopener noreferrer">Spot prices (WTI Cushing &amp; Brent Europe)</a>
             </p>
         </div>
     </div>
@@ -401,6 +405,7 @@
     <script>
         let spreadChart = null;
         let legsChart = null;
+        let basisChart = null;
 
         const periodMarkerPlugin = {
             id: 'periodMarker',
@@ -472,6 +477,7 @@
             if (isOpen) {
                 requestAnimationFrame(() => {
                     try { if (legsChart && typeof legsChart.resize === 'function') legsChart.resize(); } catch {}
+                    try { if (basisChart && typeof basisChart.resize === 'function') basisChart.resize(); } catch {}
                 });
             }
         }
@@ -641,7 +647,7 @@
             const brent = data?.intraday?.calibrated?.brent || [];
             if (!Array.isArray(ts) || ts.length < 2) return;
 
-            const labels = ts.map(formatShort);
+            const labels = ts.map((iso) => (typeof iso === 'string' ? iso.slice(0, 10) : ''));
             const ctx = canvas.getContext('2d');
             if (legsChart) { legsChart.destroy(); legsChart = null; }
 
@@ -660,11 +666,84 @@
                     interaction: { mode: 'nearest', intersect: false },
                     plugins: {
                         legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    const idx = items && items[0] ? items[0].dataIndex : null;
+                                    const iso = idx !== null && idx !== undefined ? ts[idx] : null;
+                                    return typeof iso === 'string' ? formatShort(iso) : '';
+                                },
+                                label: (ctx) => `${ctx.dataset.label}: ${formatUsd(ctx.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#888', callback: (v) => '$' + Number(v).toFixed(2) } },
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: '#888',
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 6,
+                                callback: (val) => {
+                                    const idx = Number(val);
+                                    const dateStr = Number.isFinite(idx) ? labels[idx] : null;
+                                    return typeof dateStr === 'string' ? formatDay(dateStr) : '';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderBasisChart(data) {
+            const canvas = document.getElementById('basisChart');
+            if (!canvas) return;
+
+            const wtiRaw = data?.basis?.raw?.wti || [];
+            const brentRaw = data?.basis?.raw?.brent || [];
+            if (!Array.isArray(wtiRaw) || !Array.isArray(brentRaw) || !wtiRaw.length || !brentRaw.length) return;
+
+            const byDate = {};
+            for (const r of wtiRaw) byDate[r.date] = { date: r.date, wti: r };
+            for (const r of brentRaw) {
+                byDate[r.date] = byDate[r.date] || { date: r.date };
+                byDate[r.date].brent = r;
+            }
+
+            const datesAsc = Object.keys(byDate).sort();
+            const wtiSeries = datesAsc.map((d) => (byDate[d].wti ? Number(byDate[d].wti.raw_basis) : null));
+            const brentSeries = datesAsc.map((d) => (byDate[d].brent ? Number(byDate[d].brent.raw_basis) : null));
+            const smWti = Number(data?.wti?.smoothed_basis);
+            const smBrent = Number(data?.brent?.smoothed_basis);
+
+            const ctx = canvas.getContext('2d');
+            if (basisChart) { basisChart.destroy(); basisChart = null; }
+
+            basisChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datesAsc.map(formatDay),
+                    datasets: [
+                        { label: 'WTI raw basis', data: wtiSeries, borderColor: 'rgba(229, 231, 235, 0.85)', borderWidth: 2, pointRadius: 0, tension: 0.2 },
+                        { label: 'Brent raw basis', data: brentSeries, borderColor: '#7b2cbf', borderWidth: 2.2, pointRadius: 0, tension: 0.2 },
+                        ...(Number.isFinite(smWti) ? [{ label: 'WTI smoothed', data: datesAsc.map(() => smWti), borderColor: 'rgba(229, 231, 235, 0.55)', borderDash: [6, 6], borderWidth: 1.5, pointRadius: 0 }] : []),
+                        ...(Number.isFinite(smBrent) ? [{ label: 'Brent smoothed', data: datesAsc.map(() => smBrent), borderColor: 'rgba(123, 44, 191, 0.55)', borderDash: [6, 6], borderWidth: 1.5, pointRadius: 0 }] : []),
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
                         tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatUsd(ctx.parsed.y)}` } }
                     },
                     scales: {
                         y: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#888', callback: (v) => '$' + Number(v).toFixed(2) } },
-                        x: { grid: { display: false }, ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } }
+                        x: { grid: { display: false }, ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } }
                     }
                 }
             });
@@ -731,6 +810,7 @@
                 renderSpreadChart(data);
                 renderLegsChart(data);
                 renderBasisTable(data);
+                renderBasisChart(data);
             } catch (e) {
                 if (lastUpdatedEl) lastUpdatedEl.textContent = 'Unavailable (stale)';
                 const noteEl = document.getElementById('spreadChartNote');
