@@ -925,9 +925,12 @@
         let BASELINE_YIELD = 2.85;  // Jan 30, 2026 (Bundesbank)
         let CURRENT_YIELD = 2.88;     // fallback only; live fetch will overwrite
         const THRESHOLD_BP = 20;      // ±20 basis points
-        let LIVE_SERIES = null;
-        let COMPARISON_DATA = null;
-        let MONTHLY_FLAGS_DATA = null;
+	        let LIVE_SERIES = null;
+	        let COMPARISON_DATA = null;
+	        let MONTHLY_FLAGS_DATA = null;
+	        let BASIC_RENDER_COMPLETE = false;
+	        let COMPARISON_FETCH_IN_FLIGHT = null;
+	        let MONTHLY_FLAGS_FETCH_IN_FLIGHT = null;
 
         let CURRENT_DATE_TEXT = 'Latest available';
         const BASELINE_DATE_TEXT = 'January 30, 2026';
@@ -1032,18 +1035,72 @@
 	            el.className = 'form-status' + (kind ? ` ${kind}` : '');
 	        }
 
-	        function setAdvancedOpen(open) {
-	            const isOpen = Boolean(open);
-	            document.body.classList.toggle('advanced-open', isOpen);
-	            try { localStorage.setItem('sf_full_dashboard_v1', isOpen ? '1' : '0'); } catch {}
+		        function setAdvancedOpen(open) {
+		            const isOpen = Boolean(open);
+		            document.body.classList.toggle('advanced-open', isOpen);
+		            try { localStorage.setItem('sf_full_dashboard_v1', isOpen ? '1' : '0'); } catch {}
+		
+		            const toggleBtn = document.querySelector('[data-advanced-toggle]');
+		            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
+
+		            if (isOpen && BASIC_RENDER_COMPLETE) {
+		                renderComparisonChart();
+		                ensureAdvancedDataLoaded();
+		            }
+		        }
+
+		        function isAdvancedOpen() {
+		            return document.body.classList.contains('advanced-open');
+		        }
+
+		        async function ensureComparisonLoaded() {
+		            if (COMPARISON_DATA?.series) return;
+		            if (COMPARISON_FETCH_IN_FLIGHT) return COMPARISON_FETCH_IN_FLIGHT;
+
+		            COMPARISON_FETCH_IN_FLIGHT = (async () => {
+		                try {
+		                    await fetchComparison();
+		                } catch (e) {
+		                    console.warn('Live comparison fetch failed; showing placeholder.', e);
+		                    const noteEl = document.getElementById('comparisonChartNote');
+		                    if (noteEl) noteEl.textContent = 'Comparison data unavailable (stale).';
+		                } finally {
+		                    COMPARISON_FETCH_IN_FLIGHT = null;
+		                }
+		            })();
+
+		            return COMPARISON_FETCH_IN_FLIGHT;
+		        }
+
+		        async function ensureMonthlyFlagsLoaded() {
+		            if (MONTHLY_FLAGS_DATA?.months) return;
+		            if (MONTHLY_FLAGS_FETCH_IN_FLIGHT) return MONTHLY_FLAGS_FETCH_IN_FLIGHT;
+
+		            MONTHLY_FLAGS_FETCH_IN_FLIGHT = (async () => {
+		                try {
+		                    await fetchMonthlyFlags();
+		                } catch (e) {
+		                    console.warn('Monthly history fetch failed; showing placeholder.', e);
+		                } finally {
+		                    MONTHLY_FLAGS_FETCH_IN_FLIGHT = null;
+		                }
+		            })();
+
+		            return MONTHLY_FLAGS_FETCH_IN_FLIGHT;
+		        }
+
+		        function ensureAdvancedDataLoaded() {
+		            Promise.allSettled([ensureComparisonLoaded(), ensureMonthlyFlagsLoaded()]).then(() => {
+		                if (!isAdvancedOpen()) return;
+		                renderComparisonChart();
+		                renderMonthlyFlags();
+		                try { if (comparisonChartInstance && typeof comparisonChartInstance.resize === 'function') comparisonChartInstance.resize(); } catch {}
+		            });
+		        }
 	
-	            const toggleBtn = document.querySelector('[data-advanced-toggle]');
-	            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
-	        }
-	
-	        function initAdvancedMenu() {
-	            const btn = document.getElementById('advancedBtn');
-	            const menu = document.getElementById('advancedMenu');
+		        function initAdvancedMenu() {
+		            const btn = document.getElementById('advancedBtn');
+		            const menu = document.getElementById('advancedMenu');
 	            if (!btn || !menu) return;
 	
 	            const stored = (() => {
@@ -1738,24 +1795,12 @@
                     lastUpdatedEl.textContent = fallback ? `${fallback} (stale)` : 'Unavailable (stale)';
                 }
             }
-
-            try {
-                await fetchComparison();
-            } catch (e) {
-                console.warn('Live comparison fetch failed; showing placeholder.', e);
-                const noteEl = document.getElementById('comparisonChartNote');
-                if (noteEl) noteEl.textContent = 'Comparison data unavailable (stale).';
-            }
-
-            try {
-                await fetchMonthlyFlags();
-            } catch (e) {
-                console.warn('Monthly history fetch failed; showing placeholder.', e);
-            }
-
             render();
-            renderComparisonChart();
-            renderMonthlyFlags();
+            BASIC_RENDER_COMPLETE = true;
+            if (isAdvancedOpen()) {
+                renderComparisonChart();
+                ensureAdvancedDataLoaded();
+            }
         });
     </script>
 </body>
