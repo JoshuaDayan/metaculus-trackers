@@ -945,10 +945,61 @@
 	            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
 	
 	            if (isOpen) {
+	                if (BASIC_RENDER_COMPLETE) {
+	                    ensureAdvancedDataLoaded();
+	                }
 	                requestAnimationFrame(() => {
 	                    try { if (dxyChartInstance && typeof dxyChartInstance.resize === 'function') dxyChartInstance.resize(); } catch {}
 	                });
 	            }
+	        }
+
+	        function isAdvancedOpen() {
+	            return document.body.classList.contains('advanced-open');
+	        }
+
+	        async function ensureHistoryLoaded() {
+	            if (HISTORY_SERIES) return;
+	            if (HISTORY_FETCH_IN_FLIGHT) return HISTORY_FETCH_IN_FLIGHT;
+
+	            HISTORY_FETCH_IN_FLIGHT = (async () => {
+	                try {
+	                    await fetchHistoryData();
+	                } catch (e) {
+	                    console.warn('Live 1Y/DXY fetch failed; hiding chart.', e);
+	                    const container = document.getElementById('dxyChartContainer');
+	                    if (container) container.style.display = 'none';
+	                } finally {
+	                    HISTORY_FETCH_IN_FLIGHT = null;
+	                }
+	            })();
+
+	            return HISTORY_FETCH_IN_FLIGHT;
+	        }
+
+	        async function ensureMonthlyWinnersLoaded() {
+	            if (MONTHLY_WINNERS_DATA) return;
+	            if (MONTHLY_FETCH_IN_FLIGHT) return MONTHLY_FETCH_IN_FLIGHT;
+
+	            MONTHLY_FETCH_IN_FLIGHT = (async () => {
+	                try {
+	                    await fetchMonthlyWinners();
+	                } catch (e) {
+	                    console.warn('Monthly winners fetch failed; showing placeholder.', e);
+	                } finally {
+	                    MONTHLY_FETCH_IN_FLIGHT = null;
+	                }
+	            })();
+
+	            return MONTHLY_FETCH_IN_FLIGHT;
+	        }
+
+	        function ensureAdvancedDataLoaded() {
+	            Promise.allSettled([ensureHistoryLoaded(), ensureMonthlyWinnersLoaded()]).then(() => {
+	                if (!isAdvancedOpen()) return;
+	                renderDxyChart();
+	                renderMonthlyWinners();
+	            });
 	        }
 	
 	        function initAdvancedMenu() {
@@ -1141,6 +1192,9 @@
         let HISTORY_BASELINE_DATE = null;
         let HISTORY_ASOF_DATE = null;
         let MONTHLY_WINNERS_DATA = null;
+        let BASIC_RENDER_COMPLETE = false;
+        let HISTORY_FETCH_IN_FLIGHT = null;
+        let MONTHLY_FETCH_IN_FLIGHT = null;
 
         function csvEscape(value) {
             const s = String(value ?? '');
@@ -1847,20 +1901,6 @@
                 }
             }
 
-            try {
-                await fetchHistoryData();
-            } catch (e) {
-                console.warn('Live 1Y/DXY fetch failed; hiding chart.', e);
-                const container = document.getElementById('dxyChartContainer');
-                if (container) container.style.display = 'none';
-            }
-
-            try {
-                await fetchMonthlyWinners();
-            } catch (e) {
-                console.warn('Monthly winners fetch failed; showing placeholder.', e);
-            }
-
             setDateLabels();
             const results = calculateResults();
             renderLeader(results);
@@ -1868,10 +1908,10 @@
             renderTable(results);
             renderChart(results);
             renderPerformanceChart(results);
-            renderDxyChart();
-            renderMonthlyWinners();
+            BASIC_RENDER_COMPLETE = true;
 
             if (febBtn && LIVE_SERIES) febBtn.disabled = false;
+            if (isAdvancedOpen()) ensureAdvancedDataLoaded();
         });
     </script>
 </body>
