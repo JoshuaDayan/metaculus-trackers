@@ -265,6 +265,8 @@
 
         .panel h2 { font-size: 1rem; color: #fff; }
         .note { color: #888; font-size: 0.82rem; margin-top: 8px; }
+        .note a { color: #00d4ff; text-decoration: underline; text-underline-offset: 2px; }
+        .note a:hover { text-decoration-thickness: 2px; }
 
         .btns { display: inline-flex; gap: 8px; flex-wrap: wrap; }
         .btns button {
@@ -431,7 +433,6 @@
                         <tr><td colspan="2" class="muted">Loading…</td></tr>
                     </tbody>
                 </table>
-                <div class="note muted">iShares CSV column: <code>Weight (%)</code>. Holdings can change day-to-day.</div>
             </div>
         </section>
 
@@ -476,35 +477,6 @@
         const RESOLUTION_DATE = '2026-02-27';
         const QUESTION_PERIOD_START = '2026-02-01';
         const DEFAULT_TICKERS = ['NVDA', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'META', 'AMD'];
-
-        const PERIOD_LINE_PLUGIN = {
-            id: 'periodLine',
-            afterDraw(chart, args, options) {
-                try {
-                    const xValue = options && options.xValue;
-                    if (!xValue) return;
-                    const labels = chart.data.labels || [];
-                    const idx = labels.indexOf(xValue);
-                    if (idx < 0) return;
-                    const xScale = chart.scales.x;
-                    const x = typeof xScale.getPixelForTick === 'function' ? xScale.getPixelForTick(idx) : xScale.getPixelForValue(idx);
-                    const { top, bottom } = chart.chartArea;
-                    const ctx = chart.ctx;
-
-                    ctx.save();
-                    ctx.setLineDash([6, 6]);
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = (options && options.color) || 'rgba(255,255,255,0.28)';
-                    ctx.beginPath();
-                    ctx.moveTo(x, top);
-                    ctx.lineTo(x, bottom);
-                    ctx.stroke();
-                    ctx.restore();
-                } catch (_) {
-                    // Ignore drawing errors.
-                }
-            }
-        };
 
         function parseISODate(dateStr) {
             const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
@@ -821,7 +793,6 @@
 
             historyChart = new Chart(ctx, {
                 type: 'line',
-                plugins: [PERIOD_LINE_PLUGIN],
                 data: {
                     labels,
                     datasets: [{
@@ -841,8 +812,7 @@
                     interaction: { mode: 'nearest', intersect: false },
                     plugins: {
                         legend: { display: false },
-                        tooltip: { callbacks: { label: (c) => ` ${formatPct(c.parsed.y)}` } },
-                        periodLine: { xValue: clampLabelAfter(labels, QUESTION_PERIOD_START), color: 'rgba(251, 191, 36, 0.55)' }
+                        tooltip: { callbacks: { label: (c) => ` ${formatPct(c.parsed.y)}` } }
                     },
                     scales: {
                         y: {
@@ -857,12 +827,7 @@
                 }
             });
 
-            const startLabel = clampLabelAfter(labels, QUESTION_PERIOD_START);
-            if (noteEl) {
-                noteEl.textContent = startLabel
-                    ? `Vertical dashed line marks question period start (${startLabel}).`
-                    : '';
-            }
+            if (noteEl) noteEl.textContent = '';
 
             const zoomBtn = document.getElementById('zoomToPeriodBtn');
             const resetBtn = document.getElementById('resetZoomBtn');
