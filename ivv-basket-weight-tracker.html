@@ -506,6 +506,12 @@
             return d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: '2-digit' });
         }
 
+        function formatMonthDayYear(isoDate) {
+            const d = parseISODate(isoDate);
+            if (!d) return isoDate;
+            return d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: '2-digit', year: 'numeric' });
+        }
+
         function formatPct(v) {
             if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
             return `${Number(v).toFixed(2)}%`;
@@ -530,6 +536,15 @@
                 if (labels[i] <= target) return labels[i];
             }
             return labels[labels.length - 1];
+        }
+
+        function labelForCategoryTick(labels, tickValue) {
+            if (typeof tickValue === 'string') return tickValue;
+            const idx = Number(tickValue);
+            if (Number.isFinite(idx) && Array.isArray(labels) && idx >= 0 && idx < labels.length) {
+                return labels[idx];
+            }
+            return String(tickValue);
         }
 
         function generateBusinessDates(startIsoExclusive, endIsoInclusive) {
@@ -752,9 +767,9 @@
             document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
         }
 
-        function renderWeightsTable({ tickers, weights }) {
-            const body = document.getElementById('weightsTableBody');
-            if (!body) return;
+	        function renderWeightsTable({ tickers, weights }) {
+	            const body = document.getElementById('weightsTableBody');
+	            if (!body) return;
             body.innerHTML = '';
             for (const t of tickers) {
                 const tr = document.createElement('tr');
@@ -773,13 +788,37 @@
             tdT2.innerHTML = `<strong>${formatPct(DATA?.basket?.totalWeight)}</strong>`;
             trTotal.appendChild(tdT1);
             trTotal.appendChild(tdT2);
-            body.appendChild(trTotal);
-        }
+	            body.appendChild(trTotal);
+	        }
 
-        function renderHistoryChart() {
-            const canvas = document.getElementById('historyChart');
-            const noteEl = document.getElementById('historyNote');
-            if (!canvas) return;
+	        function updateHistoryNote() {
+	            const noteEl = document.getElementById('historyNote');
+	            if (!noteEl || !historyChart) return;
+
+	            const labels = Array.isArray(historyChart.data?.labels) ? historyChart.data.labels : [];
+	            if (!labels.length) {
+	                noteEl.textContent = '';
+	                return;
+	            }
+
+	            const minOpt = historyChart.options?.scales?.x?.min;
+	            const maxOpt = historyChart.options?.scales?.x?.max;
+	            const minLabel = (minOpt !== undefined && minOpt !== null) ? labelForCategoryTick(labels, minOpt) : labels[0];
+	            const maxLabel = (maxOpt !== undefined && maxOpt !== null) ? labelForCategoryTick(labels, maxOpt) : labels[labels.length - 1];
+
+	            const parts = [`Showing ${formatMonthDayYear(minLabel)} → ${formatMonthDayYear(maxLabel)}.`];
+	            const denseFrom = DATA?.sampling?.denseFrom;
+	            const strideDays = DATA?.sampling?.coarseStrideDays;
+	            if (denseFrom && strideDays) {
+	                parts.push(`Sampling: daily from ${denseFrom}; older dates downsampled (≈ every ${strideDays} weekdays).`);
+	            }
+
+	            noteEl.textContent = parts.join(' ');
+	        }
+
+	        function renderHistoryChart() {
+	            const canvas = document.getElementById('historyChart');
+	            if (!canvas) return;
 
             const labels = DATA.series.dates;
             const values = DATA.series.total;
@@ -815,38 +854,40 @@
                             grid: { color: 'rgba(255,255,255,0.08)' },
                             ticks: { color: '#888', callback: (v) => `${Number(v).toFixed(1)}%` }
                         },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#888', autoSkip: true, maxRotation: 0, callback: (_, i) => formatMonthDay(labels[i]) }
-                        }
-                    }
-                }
-            });
+	                        x: {
+	                            grid: { display: false },
+	                            ticks: { color: '#888', autoSkip: true, maxRotation: 0, callback: (v) => formatMonthDay(labelForCategoryTick(labels, v)) }
+	                        }
+	                    }
+	                }
+		            });
+	
+	            updateHistoryNote();
 
-            if (noteEl) noteEl.textContent = '';
-
-            const zoomBtn = document.getElementById('zoomToPeriodBtn');
-            const resetBtn = document.getElementById('resetZoomBtn');
-            if (zoomBtn) zoomBtn.disabled = false;
+	            const zoomBtn = document.getElementById('zoomToPeriodBtn');
+	            const resetBtn = document.getElementById('resetZoomBtn');
+	            if (zoomBtn) zoomBtn.disabled = false;
             if (resetBtn) resetBtn.disabled = false;
         }
 
-        function applyHistoryZoom({ minIso, maxIso }) {
-            if (!historyChart) return;
-            const labels = historyChart.data.labels || [];
-            const min = clampLabelAfter(labels, minIso);
-            const max = clampLabelBefore(labels, maxIso);
-            historyChart.options.scales.x.min = min;
-            historyChart.options.scales.x.max = max;
-            historyChart.update();
-        }
+	        function applyHistoryZoom({ minIso, maxIso }) {
+	            if (!historyChart) return;
+	            const labels = historyChart.data.labels || [];
+	            const min = clampLabelAfter(labels, minIso);
+	            const max = clampLabelBefore(labels, maxIso);
+	            historyChart.options.scales.x.min = min;
+	            historyChart.options.scales.x.max = max;
+	            historyChart.update();
+	            updateHistoryNote();
+	        }
 
-        function resetHistoryZoom() {
-            if (!historyChart) return;
-            historyChart.options.scales.x.min = undefined;
-            historyChart.options.scales.x.max = undefined;
-            historyChart.update();
-        }
+	        function resetHistoryZoom() {
+	            if (!historyChart) return;
+	            historyChart.options.scales.x.min = undefined;
+	            historyChart.options.scales.x.max = undefined;
+	            historyChart.update();
+	            updateHistoryNote();
+	        }
 
         function renderProjectionChart(modelKey) {
             const canvas = document.getElementById('projectionChart');
@@ -959,13 +1000,13 @@
                             grid: { color: 'rgba(255,255,255,0.08)' },
                             ticks: { color: '#888', callback: (v) => `${Number(v).toFixed(1)}%` }
                         },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#888', autoSkip: true, maxRotation: 0, callback: (_, i) => formatMonthDay(labels[i]) }
-                        }
-                    }
-                }
-            });
+	                        x: {
+	                            grid: { display: false },
+	                            ticks: { color: '#888', autoSkip: true, maxRotation: 0, callback: (v) => formatMonthDay(labelForCategoryTick(labels, v)) }
+	                        }
+	                    }
+	                }
+	            });
 
             if (!noteEl) return;
             if (futureDates.length === 0) {
