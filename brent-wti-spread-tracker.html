@@ -289,7 +289,7 @@
                     <button class="menu-item primary" type="button" data-advanced-toggle>Full dashboard</button>
                     <button class="menu-item" type="button" data-advanced-jump="legsChartContainer">WTI &amp; Brent legs <span class="menu-hint">↘</span></button>
                     <button class="menu-item" type="button" data-advanced-jump="basisTableContainer">Calibration basis <span class="menu-hint">↘</span></button>
-                    <button class="menu-item" type="button" data-advanced-jump="verify">Verify &amp; sources <span class="menu-hint">↘</span></button>
+                    <button class="menu-item" type="button" data-advanced-jump="verify">Wordcel comment <span class="menu-hint">↘</span></button>
                 </div>
             </div>
         </div>
@@ -371,7 +371,7 @@
         </div>
 
         <div class="info-section advanced-only" id="verify">
-            <h3>✅ Data sources &amp; methodology</h3>
+            <h3>📝 Wordcel Statistician's Comment</h3>
             <p>
                 <strong>Ground truth / resolution source:</strong>
                 EIA daily spot prices (WTI “Cushing, Oklahoma” = <span class="mono">RWTC</span>, Brent “Europe” = <span class="mono">RBRTE</span>).
@@ -535,26 +535,52 @@
             const canvas = document.getElementById('spreadChart');
             if (!container || !canvas) return;
 
-            const dates = data?.history?.daily?.dates || [];
-            const series = data?.history?.daily?.calibrated_spread || [];
-            if (!Array.isArray(series) || !Array.isArray(dates) || dates.length < 2 || series.length < 2) {
-                if (noteEl) noteEl.textContent = 'Not enough data to render chart yet.';
-                return;
+            const tsAll = data?.intraday?.timestamps || [];
+            const seriesAll = data?.intraday?.calibrated?.spread || [];
+            const periodStart = data?.history?.period_start || null;
+
+            let ts = tsAll;
+            let series = seriesAll;
+
+            if (typeof periodStart === 'string' && periodStart.length === 10 && Array.isArray(tsAll) && Array.isArray(seriesAll)) {
+                const fTs = [];
+                const fSeries = [];
+                for (let i = 0; i < Math.min(tsAll.length, seriesAll.length); i += 1) {
+                    const iso = tsAll[i];
+                    if (typeof iso !== 'string') continue;
+                    if (iso.slice(0, 10) < periodStart) continue;
+                    fTs.push(iso);
+                    fSeries.push(seriesAll[i]);
+                }
+                ts = fTs;
+                series = fSeries;
             }
 
-            const labels = dates.map(formatDay);
-            const periodStart = data?.history?.period_start || null;
+            // Fallback to daily history if intraday is unavailable.
+            if (!Array.isArray(series) || !Array.isArray(ts) || ts.length < 2 || series.length < 2) {
+                const dates = data?.history?.daily?.dates || [];
+                const dailySeries = data?.history?.daily?.calibrated_spread || [];
+                if (!Array.isArray(dates) || !Array.isArray(dailySeries) || dates.length < 2 || dailySeries.length < 2) {
+                    if (noteEl) noteEl.textContent = 'Not enough data to render chart yet.';
+                    return;
+                }
+                ts = dates.map((d) => `${d}T00:00:00.000Z`);
+                series = dailySeries;
+            }
+
+            const labels = ts.map(formatShort);
             let periodIndex = null;
             if (typeof periodStart === 'string' && periodStart.length === 10) {
-                const idx = dates.findIndex((d) => d >= periodStart);
+                const idx = ts.findIndex((iso) => typeof iso === 'string' && iso.slice(0, 10) >= periodStart);
                 if (idx >= 0) periodIndex = idx;
             }
 
             if (noteEl) {
-                const start = dates[0];
-                const end = dates[dates.length - 1];
+                const startIso = ts[0];
+                const endIso = ts[ts.length - 1];
+                const interval = data?.intraday?.interval || '—';
                 const dottedLabel = periodStart ? ` • Dotted line: ${formatDay(periodStart)}` : '';
-                noteEl.textContent = `Range: ${formatDay(start)} → ${formatDay(end)} (daily closes)${dottedLabel}`;
+                noteEl.textContent = `Range: ${formatShort(startIso)} → ${formatShort(endIso)} • Interval: ${interval}${dottedLabel}`;
             }
 
             const ctx = canvas.getContext('2d');

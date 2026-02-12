@@ -14,6 +14,10 @@ const YAHOO_SYMBOL_BRENT = "BZ=F";
 const TARGET_DATE = "2026-03-04";
 const INTERPOLATION_DEADLINE = "2026-03-14";
 
+// UI tracking window (for charts). Keep explicit dates to avoid shifting as time passes.
+const TRACKING_YEAR_START = "2026-01-01";
+const TRACKING_PERIOD_START = "2026-02-01";
+
 const BASIS_HALF_LIFE_BUSINESS_DAYS = 3;
 const BASIS_LAMBDA = Math.pow(0.5, 1 / BASIS_HALF_LIFE_BUSINESS_DAYS); // ~0.794
 const BASIS_ALPHA = 1 - BASIS_LAMBDA; // ~0.206
@@ -23,7 +27,7 @@ const RAW_BASIS_WINDOW_DAYS = 10;
 const DAILY_FETCH_LOOKBACK_DAYS = 240;
 
 const INTRADAY_INTERVAL = "5m";
-const INTRADAY_RANGE_DAYS = 5;
+const INTRADAY_RANGE = "1mo";
 
 const DEFAULT_CDN_CACHE_SECONDS = 10 * 60; // 10 minutes
 const DEFAULT_STALE_WHILE_REVALIDATE_SECONDS = 24 * 60 * 60; // 1 day
@@ -214,10 +218,10 @@ async function fetchYahooDailyCloses(symbol, startInclusive, endExclusive) {
   };
 }
 
-async function fetchYahooIntraday(symbol, { days, interval }) {
+async function fetchYahooIntraday(symbol, { range, interval }) {
   const params = new URLSearchParams({
     interval,
-    range: `${days}d`,
+    range: String(range),
     includePrePost: "false",
   });
 
@@ -436,9 +440,8 @@ exports.handler = async () => {
 
     const basisSpread = smoothedBasisBrent - smoothedBasisWti;
 
-    const now = new Date();
-    const yearStartStr = `${now.getUTCFullYear()}-01-01`;
-    const periodStartStr = `${nowDateStr.slice(0, 7)}-01`;
+    const yearStartStr = TRACKING_YEAR_START;
+    const periodStartStr = TRACKING_PERIOD_START;
 
     const dailyCommonDates = Object.keys(wtiDaily.closeByDate || {})
       .filter((d) => Number.isFinite(wtiDaily.closeByDate[d]) && Number.isFinite(brentDaily.closeByDate?.[d]))
@@ -473,22 +476,48 @@ exports.handler = async () => {
     const intraday = {
       available: false,
       interval: INTRADAY_INTERVAL,
-      rangeDays: INTRADAY_RANGE_DAYS,
+      range: INTRADAY_RANGE,
       timestamps: [],
       futures: { wti: [], brent: [] },
       calibrated: { wti: [], brent: [], spread: [] },
     };
     try {
-      const [wtiIntra, brentIntra] = await Promise.all([
-        fetchYahooIntraday(YAHOO_SYMBOL_WTI, { days: INTRADAY_RANGE_DAYS, interval: INTRADAY_INTERVAL }),
-        fetchYahooIntraday(YAHOO_SYMBOL_BRENT, { days: INTRADAY_RANGE_DAYS, interval: INTRADAY_INTERVAL }),
-      ]);
+      const attempts = [
+        { interval: INTRADAY_INTERVAL, range: INTRADAY_RANGE },
+        { interval: "15m", range: INTRADAY_RANGE },
+        { interval: INTRADAY_INTERVAL, range: "5d" },
+      ];
+
+      let wtiIntra = null;
+      let brentIntra = null;
+      for (const attempt of attempts) {
+        try {
+          [wtiIntra, brentIntra] = await Promise.all([
+            fetchYahooIntraday(YAHOO_SYMBOL_WTI, attempt),
+            fetchYahooIntraday(YAHOO_SYMBOL_BRENT, attempt),
+          ]);
+          intraday.interval = attempt.interval;
+          intraday.range = attempt.range;
+          break;
+        } catch {
+          wtiIntra = null;
+          brentIntra = null;
+        }
+      }
+
+      if (!wtiIntra || !brentIntra) {
+        throw new Error("Yahoo intraday unavailable");
+      }
 
       const commonTs = Array.from(wtiIntra.byTs.keys())
         .filter((ts) => brentIntra.byTs.has(ts))
         .sort((a, b) => a - b);
 
-      for (const ts of commonTs) {
+      const periodStartDate = parseISODate(periodStartStr);
+      const periodStartSec = periodStartDate ? Math.floor(periodStartDate.getTime() / 1000) : null;
+      const filteredTs = periodStartSec ? commonTs.filter((ts) => ts >= periodStartSec) : commonTs;
+
+      for (const ts of filteredTs) {
         const w = wtiIntra.byTs.get(ts);
         const b = brentIntra.byTs.get(ts);
         if (!Number.isFinite(w) || !Number.isFinite(b)) continue;
