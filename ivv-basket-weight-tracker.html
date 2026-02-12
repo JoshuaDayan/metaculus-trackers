@@ -364,18 +364,14 @@
                     <span class="ext" aria-hidden="true">↗</span>
                 </a>
             </p>
-            <div class="foundation-subtitle">
-                Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
-            </div>
+	            <div class="foundation-subtitle">
+	                Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
+	            </div>
 
-            <div class="question-box advanced-only">
-                <strong>Data:</strong> iShares IVV holdings CSV (<code>Weight (%)</code>)<br>
-                <strong>Basket:</strong> <code>NVDA</code>, <code>MSFT</code>, <code>GOOGL</code>, <code>GOOG</code>, <code>AMZN</code>, <code>META</code>, <code>AMD</code><br>
-                <strong>Source:</strong>
-                <a href="https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf" target="_blank" rel="noopener noreferrer">
-                    iShares Core S&amp;P 500 ETF (IVV) <span class="ext" aria-hidden="true">↗</span>
-                </a>
-            </div>
+	            <div class="question-box advanced-only">
+	                <strong>Resolution:</strong> Basket weight in IVV holdings as of Feb 27, 2026 (iShares snapshot).<br>
+	                <strong>Formula:</strong> <code>BasketWeight% = Σ Weight%(ticker)</code> (basket shown above).
+	            </div>
             <div class="meta">
                 <div class="pill">Resolution date: <strong id="resolutionDatePill">2026-02-27</strong></div>
                 <div class="pill">Question period start: <strong id="periodStartPill">2026-02-01</strong></div>

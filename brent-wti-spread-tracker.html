@@ -331,11 +331,11 @@
                 Funding provided by the Ben Shindel Memorial Foundation<br>For Superforecasters Who Can't Predict Good
             </div>
 
-            <div class="question-box advanced-only">
-                <strong>Resolution:</strong> Metaculus resolves using EIA spot prices on <strong>March 4, 2026</strong>. If EIA doesn’t publish both spots before <strong>March 14, 2026</strong>, Metaculus linearly interpolates between the closest days with both values.<br>
-                <strong>Formula:</strong> <code>Spread (USD/bbl) = Brent_spot − WTI_spot</code><br>
-                <strong>Ground truth:</strong> EIA “Brent - Europe” and “WTI - Cushing, Oklahoma” spot price series. This page’s <em>calibrated</em> line uses EIA spot as ground truth plus Yahoo futures as a live proxy between EIA releases.
-            </div>
+	            <div class="question-box advanced-only">
+	                <strong>Resolution:</strong> EIA spot spread on Mar 4, 2026 (interpolate if missing by Mar 14).<br>
+	                <strong>Formula:</strong> <code>Spread (USD/bbl) = Brent_spot − WTI_spot</code><br>
+	                <strong>Calibration (this page):</strong> <code>Calibrated ≈ Yahoo futures + EWMA(basis)</code>, where <code>basis = EIA spot − Yahoo futures close</code>.
+	            </div>
         </header>
 
         <div class="overview-row">
