@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IVV Basket Weight Tracker | Metaculus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        /* Top navigation (shared style) */
+        .top-nav {
+            position: sticky;
+            top: 10px;
+            z-index: 1100;
+            margin-bottom: 18px;
+        }
+
+        .top-nav-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 14px;
+            backdrop-filter: blur(10px);
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: #e0e0e0;
+            font-weight: 800;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            text-decoration: none;
+        }
+
+        .brand-mark {
+            width: 12px;
+            height: 28px;
+            border-radius: 7px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .nav-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(0,0,0,0.20);
+            color: #cfd6e6;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.15s ease;
+        }
+
+        .nav-tab:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255,255,255,0.16);
+            background: rgba(255,255,255,0.06);
+        }
+
+        .nav-tab.active {
+            background: rgba(0, 212, 255, 0.14);
+            border-color: rgba(0, 212, 255, 0.35);
+            color: #9ff0ff;
+        }
+
+        @media (max-width: 768px) {
+            .top-nav { top: 0; }
+            .top-nav-inner { flex-wrap: wrap; justify-content: center; }
+            .brand { width: 100%; justify-content: center; }
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 18px;
+            padding: 22px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 8px; }
+        .subtitle a { color: #00d4ff; text-decoration: underline; text-underline-offset: 2px; }
+
+        .meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.10);
+            font-size: 0.85rem;
+            color: #cfd6e6;
+        }
+
+        .pill strong { color: #9ff0ff; }
+        .pill code { color: #fbbf24; font-weight: 700; }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .card {
+            padding: 16px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.10);
+        }
+
+        .card-title { color: #888; font-size: 0.8rem; margin-bottom: 8px; }
+        .card-value { font-size: 1.8rem; font-weight: 900; }
+        .card-sub { margin-top: 6px; color: #aaa; font-size: 0.85rem; }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1.35fr 0.65fr;
+            gap: 14px;
+            align-items: start;
+        }
+
+        @media (max-width: 1100px) {
+            .row { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .panel h2 { font-size: 1rem; color: #fff; }
+        .note { color: #888; font-size: 0.82rem; margin-top: 8px; }
+
+        .btns { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+        button {
+            appearance: none;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(0,0,0,0.20);
+            color: #cfd6e6;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        button:hover { transform: translateY(-1px); background: rgba(255,255,255,0.06); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .chart-wrap { height: 360px; }
+        canvas { width: 100% !important; height: 100% !important; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+            border-radius: 12px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            font-size: 0.9rem;
+        }
+
+        th { color: #9ff0ff; font-size: 0.8rem; letter-spacing: 0.5px; text-transform: uppercase; }
+        td code { color: #fbbf24; font-weight: 900; }
+
+        .muted { color: #888; }
+
+        .select {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        select {
+            background: rgba(0,0,0,0.25);
+            color: #e0e0e0;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-weight: 800;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="top-nav" aria-label="Top navigation">
+            <div class="top-nav-inner">
+                <a class="brand" href="/" title="Metaculus Trackers">
+                    <span class="brand-mark" aria-hidden="true"></span>
+                    Metaculus Trackers
+                </a>
+                <div class="nav-tabs" role="navigation" aria-label="Pages">
+                    <a class="nav-tab" href="february-2026-currency-tracker.html">Currency</a>
+                    <a class="nav-tab" href="german-bond-tracker.html">Bond</a>
+                    <a class="nav-tab" href="brent-wti-spread-tracker.html">Oil</a>
+                    <a class="nav-tab active" href="ivv-basket-weight-tracker.html">IVV Basket</a>
+                </div>
+            </div>
+        </nav>
+
+        <header>
+            <h1>IVV Basket Weight Tracker</h1>
+            <div class="subtitle">
+                Live holdings from
+                <a href="https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf" target="_blank" rel="noopener noreferrer">
+                    iShares Core S&amp;P 500 ETF (IVV)
+                </a>
+            </div>
+            <div class="meta">
+                <div class="pill">Resolution date: <strong id="resolutionDatePill">2026-02-27</strong></div>
+                <div class="pill">Question period start: <strong id="periodStartPill">2026-02-01</strong></div>
+                <div class="pill">Basket: <code>NVDA</code> <code>MSFT</code> <code>GOOGL</code> <code>GOOG</code> <code>AMZN</code> <code>META</code> <code>AMD</code></div>
+                <div class="pill">Last updated: <strong id="lastUpdated">Loading…</strong></div>
+            </div>
+        </header>
+
+        <section class="cards">
+            <div class="card">
+                <div class="card-title">Current basket weight</div>
+                <div class="card-value" id="currentTotal">—</div>
+                <div class="card-sub muted" id="currentAsOf">As of —</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Change since period start</div>
+                <div class="card-value" id="changeSinceStart">—</div>
+                <div class="card-sub muted" id="startValueNote">Start value —</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Time to resolution</div>
+                <div class="card-value" id="daysToResolution">—</div>
+                <div class="card-sub muted" id="targetAvailability">Target holdings —</div>
+            </div>
+        </section>
+
+        <section class="row">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Basket weight (last 6 months)</h2>
+                    <div class="btns">
+                        <button id="zoomToPeriodBtn" type="button" disabled>Zoom to question period</button>
+                        <button id="resetZoomBtn" type="button" disabled>Reset zoom</button>
+                        <button id="downloadHistoryBtn" type="button" disabled>Download CSV</button>
+                    </div>
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="historyChart"></canvas>
+                </div>
+                <div class="note" id="historyNote"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Latest weights</h2>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Weight</th>
+                        </tr>
+                    </thead>
+                    <tbody id="weightsTableBody">
+                        <tr><td colspan="2" class="muted">Loading…</td></tr>
+                    </tbody>
+                </table>
+                <div class="note muted">iShares CSV column: <code>Weight (%)</code>. Holdings can change day-to-day.</div>
+            </div>
+        </section>
+
+        <section class="panel" style="margin-top: 14px;">
+            <div class="panel-header">
+                <h2>Projections to resolution</h2>
+                <div class="select">
+                    <label class="muted" for="projectionModel">Model</label>
+                    <select id="projectionModel">
+                        <option value="linear">Linear regression (lookback 60d)</option>
+                        <option value="exp">Exponential trend (lookback 60d)</option>
+                        <option value="mc">Monte Carlo (deltas, lookback 60d)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="chart-wrap" style="height: 340px;">
+                <canvas id="projectionChart"></canvas>
+            </div>
+            <div class="note muted" id="projectionNote">
+                Projections are naive and for visualization only (not investment advice).
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const RESOLUTION_DATE = '2026-02-27';
+        const QUESTION_PERIOD_START = '2026-02-01';
+        const DEFAULT_TICKERS = ['NVDA', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'META', 'AMD'];
+
+        const PERIOD_LINE_PLUGIN = {
+            id: 'periodLine',
+            afterDraw(chart, args, options) {
+                try {
+                    const xValue = options && options.xValue;
+                    if (!xValue) return;
+                    const labels = chart.data.labels || [];
+                    const idx = labels.indexOf(xValue);
+                    if (idx < 0) return;
+                    const xScale = chart.scales.x;
+                    const x = typeof xScale.getPixelForTick === 'function' ? xScale.getPixelForTick(idx) : xScale.getPixelForValue(idx);
+                    const { top, bottom } = chart.chartArea;
+                    const ctx = chart.ctx;
+
+                    ctx.save();
+                    ctx.setLineDash([6, 6]);
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = (options && options.color) || 'rgba(255,255,255,0.28)';
+                    ctx.beginPath();
+                    ctx.moveTo(x, top);
+                    ctx.lineTo(x, bottom);
+                    ctx.stroke();
+                    ctx.restore();
+                } catch (_) {
+                    // Ignore drawing errors.
+                }
+            }
+        };
+
+        function parseISODate(dateStr) {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+            if (!m) return null;
+            const year = Number(m[1]);
+            const month = Number(m[2]);
+            const day = Number(m[3]);
+            const date = new Date(Date.UTC(year, month - 1, day));
+            if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+            return date;
+        }
+
+        function toISODate(date) {
+            return date.toISOString().slice(0, 10);
+        }
+
+        function addDays(date, days) {
+            const d = new Date(date.getTime());
+            d.setUTCDate(d.getUTCDate() + days);
+            return d;
+        }
+
+        function isWeekday(date) {
+            const day = date.getUTCDay();
+            return day >= 1 && day <= 5;
+        }
+
+        function formatMonthDay(isoDate) {
+            const d = parseISODate(isoDate);
+            if (!d) return isoDate;
+            return d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: '2-digit' });
+        }
+
+        function formatPct(v) {
+            if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
+            return `${Number(v).toFixed(2)}%`;
+        }
+
+        function formatSignedPctPoints(v) {
+            if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
+            const n = Number(v);
+            const sign = n >= 0 ? '+' : '';
+            return `${sign}${n.toFixed(2)} pp`;
+        }
+
+        function clampLabelAfter(labels, target) {
+            if (!labels.length) return null;
+            for (const l of labels) if (l >= target) return l;
+            return labels[0];
+        }
+
+        function clampLabelBefore(labels, target) {
+            if (!labels.length) return null;
+            for (let i = labels.length - 1; i >= 0; i -= 1) {
+                if (labels[i] <= target) return labels[i];
+            }
+            return labels[labels.length - 1];
+        }
+
+        function generateBusinessDates(startIsoExclusive, endIsoInclusive) {
+            const start = parseISODate(startIsoExclusive);
+            const end = parseISODate(endIsoInclusive);
+            if (!start || !end) return [];
+            if (end <= start) return [];
+            const out = [];
+            let cur = addDays(start, 1);
+            while (cur <= end) {
+                if (isWeekday(cur)) out.push(toISODate(cur));
+                cur = addDays(cur, 1);
+            }
+            return out;
+        }
+
+        function csvEscape(value) {
+            const s = String(value ?? '');
+            if (/[\",\\n]/.test(s)) return '"' + s.replace(/\"/g, '""') + '"';
+            return s;
+        }
+
+        function downloadCsv(filename, rows) {
+            const csv = rows.map(r => r.map(csvEscape).join(',')).join('\\n') + '\\n';
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function olsFit(xs, ys) {
+            const n = xs.length;
+            if (n < 2) return { a: ys[0] ?? 0, b: 0 };
+            let sumX = 0, sumY = 0;
+            for (let i = 0; i < n; i += 1) { sumX += xs[i]; sumY += ys[i]; }
+            const meanX = sumX / n;
+            const meanY = sumY / n;
+            let cov = 0, varX = 0;
+            for (let i = 0; i < n; i += 1) {
+                const dx = xs[i] - meanX;
+                cov += dx * (ys[i] - meanY);
+                varX += dx * dx;
+            }
+            if (varX === 0) return { a: meanY, b: 0 };
+            const b = cov / varX;
+            const a = meanY - b * meanX;
+            return { a, b };
+        }
+
+        function computeLinearProjection(history, futureSteps, lookback) {
+            const n = history.length;
+            const k = Math.max(2, Math.min(lookback, n));
+            const slice = history.slice(n - k);
+            const xs = slice.map((_, i) => i);
+            const ys = slice.map(v => Number(v));
+            const lastActual = Number(history[n - 1]);
+            const fit = olsFit(xs, ys);
+            const predLast = fit.a + fit.b * (k - 1);
+            const a = fit.a + (lastActual - predLast);
+            const b = fit.b;
+            return Array.from({ length: futureSteps }, (_, step) => a + b * ((k - 1) + (step + 1)));
+        }
+
+        function computeExpProjection(history, futureSteps, lookback) {
+            const n = history.length;
+            const k = Math.max(2, Math.min(lookback, n));
+            const slice = history.slice(n - k).map(v => Number(v));
+            const xs = slice.map((_, i) => i);
+            const ys = slice.map(v => (v > 0 ? Math.log(v) : null)).filter(v => v !== null);
+            if (ys.length < 2) return computeLinearProjection(history, futureSteps, lookback);
+            // Align xs with non-null ys.
+            const xs2 = [];
+            const ys2 = [];
+            for (let i = 0; i < slice.length; i += 1) {
+                const v = slice[i];
+                if (v > 0) { xs2.push(i); ys2.push(Math.log(v)); }
+            }
+            const fit = olsFit(xs2, ys2);
+            const A = Math.exp(fit.a);
+            const kRate = fit.b;
+            const lastActual = Number(history[n - 1]);
+            const predLast = A * Math.exp(kRate * (k - 1));
+            const scale = predLast > 0 ? (lastActual / predLast) : 1;
+            const A2 = A * scale;
+            return Array.from({ length: futureSteps }, (_, step) => A2 * Math.exp(kRate * ((k - 1) + (step + 1))));
+        }
+
+        function randn() {
+            // Box-Muller transform
+            let u = 0, v = 0;
+            while (u === 0) u = Math.random();
+            while (v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+
+        function meanStd(values) {
+            const n = values.length;
+            if (!n) return { mean: 0, std: 0 };
+            const mean = values.reduce((a, b) => a + b, 0) / n;
+            const var_ = values.reduce((a, b) => a + (b - mean) * (b - mean), 0) / Math.max(1, n - 1);
+            return { mean, std: Math.sqrt(var_) };
+        }
+
+        function quantile(sortedArr, q) {
+            if (!sortedArr.length) return null;
+            const idx = Math.floor(q * (sortedArr.length - 1));
+            return sortedArr[Math.max(0, Math.min(sortedArr.length - 1, idx))];
+        }
+
+        function computeMonteCarlo(history, futureSteps, lookback, paths) {
+            const n = history.length;
+            const k = Math.max(5, Math.min(lookback, n));
+            const slice = history.slice(n - k).map(v => Number(v));
+            const deltas = [];
+            for (let i = 1; i < slice.length; i += 1) deltas.push(slice[i] - slice[i - 1]);
+            const { mean, std } = meanStd(deltas);
+            const start = Number(history[n - 1]);
+
+            const perStep = Array.from({ length: futureSteps }, () => []);
+            for (let p = 0; p < paths; p += 1) {
+                let y = start;
+                for (let s = 0; s < futureSteps; s += 1) {
+                    y = y + mean + std * randn();
+                    perStep[s].push(y);
+                }
+            }
+
+            const p10 = [];
+            const p50 = [];
+            const p90 = [];
+            for (let s = 0; s < futureSteps; s += 1) {
+                const arr = perStep[s].slice().sort((a, b) => a - b);
+                p10.push(quantile(arr, 0.10));
+                p50.push(quantile(arr, 0.50));
+                p90.push(quantile(arr, 0.90));
+            }
+            return { p10, p50, p90, meanDelta: mean, stdDelta: std };
+        }
+
+        let historyChart = null;
+        let projectionChart = null;
+        let DATA = null;
+
+        function renderWeightsTable({ tickers, weights }) {
+            const body = document.getElementById('weightsTableBody');
+            if (!body) return;
+            body.innerHTML = '';
+            for (const t of tickers) {
+                const tr = document.createElement('tr');
+                const td1 = document.createElement('td');
+                const td2 = document.createElement('td');
+                td1.innerHTML = `<code>${t}</code>`;
+                td2.textContent = formatPct(weights?.[t]);
+                tr.appendChild(td1);
+                tr.appendChild(td2);
+                body.appendChild(tr);
+            }
+            const trTotal = document.createElement('tr');
+            const tdT1 = document.createElement('td');
+            const tdT2 = document.createElement('td');
+            tdT1.innerHTML = '<strong>Total</strong>';
+            tdT2.innerHTML = `<strong>${formatPct(DATA?.basket?.totalWeight)}</strong>`;
+            trTotal.appendChild(tdT1);
+            trTotal.appendChild(tdT2);
+            body.appendChild(trTotal);
+        }
+
+        function renderHistoryChart() {
+            const canvas = document.getElementById('historyChart');
+            const noteEl = document.getElementById('historyNote');
+            if (!canvas) return;
+
+            const labels = DATA.series.dates;
+            const values = DATA.series.total;
+
+            if (historyChart) { historyChart.destroy(); historyChart = null; }
+            const ctx = canvas.getContext('2d');
+
+            historyChart = new Chart(ctx, {
+                type: 'line',
+                plugins: [PERIOD_LINE_PLUGIN],
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Basket weight',
+                        data: values,
+                        borderColor: '#00d4ff',
+                        backgroundColor: 'rgba(0, 212, 255, 0.10)',
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        tension: 0.25
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (c) => ` ${formatPct(c.parsed.y)}` } },
+                        periodLine: { xValue: clampLabelAfter(labels, QUESTION_PERIOD_START), color: 'rgba(251, 191, 36, 0.55)' }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: (v) => `${Number(v).toFixed(1)}%` }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', autoSkip: true, maxRotation: 0, callback: (_, i) => formatMonthDay(labels[i]) }
+                        }
+                    }
+                }
+            });
+
+            const startLabel = clampLabelAfter(labels, QUESTION_PERIOD_START);
+            if (noteEl) {
+                noteEl.textContent = startLabel
+                    ? `Vertical dashed line marks question period start (${startLabel}).`
+                    : '';
+            }
+
+            const zoomBtn = document.getElementById('zoomToPeriodBtn');
+            const resetBtn = document.getElementById('resetZoomBtn');
+            if (zoomBtn) zoomBtn.disabled = false;
+            if (resetBtn) resetBtn.disabled = false;
+        }
+
+        function applyHistoryZoom({ minIso, maxIso }) {
+            if (!historyChart) return;
+            const labels = historyChart.data.labels || [];
+            const min = clampLabelAfter(labels, minIso);
+            const max = clampLabelBefore(labels, maxIso);
+            historyChart.options.scales.x.min = min;
+            historyChart.options.scales.x.max = max;
+            historyChart.update();
+        }
+
+        function resetHistoryZoom() {
+            if (!historyChart) return;
+            historyChart.options.scales.x.min = undefined;
+            historyChart.options.scales.x.max = undefined;
+            historyChart.update();
+        }
+
+        function renderProjectionChart(modelKey) {
+            const canvas = document.getElementById('projectionChart');
+            const noteEl = document.getElementById('projectionNote');
+            if (!canvas) return;
+
+            const histDates = DATA.series.dates;
+            const histValues = DATA.series.total;
+            const lastDate = histDates[histDates.length - 1];
+
+            const futureDates = generateBusinessDates(lastDate, RESOLUTION_DATE);
+            const labels = histDates.concat(futureDates);
+
+            const actual = histValues.concat(Array.from({ length: futureDates.length }, () => null));
+
+            const lookback = 60;
+            let projection = [];
+            let band = null;
+
+            if (futureDates.length === 0) {
+                projection = Array.from({ length: labels.length }, () => null);
+            } else if (modelKey === 'linear') {
+                const future = computeLinearProjection(histValues, futureDates.length, lookback);
+                const prefix = Array.from({ length: histValues.length }, () => null);
+                prefix[prefix.length - 1] = histValues[histValues.length - 1];
+                projection = prefix.concat(future);
+            } else if (modelKey === 'exp') {
+                const future = computeExpProjection(histValues, futureDates.length, lookback);
+                const prefix = Array.from({ length: histValues.length }, () => null);
+                prefix[prefix.length - 1] = histValues[histValues.length - 1];
+                projection = prefix.concat(future);
+            } else {
+                const paths = 1200;
+                const mc = computeMonteCarlo(histValues, futureDates.length, lookback, paths);
+                const prefix = Array.from({ length: histValues.length }, () => null);
+                prefix[prefix.length - 1] = histValues[histValues.length - 1];
+                projection = prefix.concat(mc.p50);
+                band = {
+                    p10: prefix.concat(mc.p10),
+                    p90: prefix.concat(mc.p90),
+                    meanDelta: mc.meanDelta,
+                    stdDelta: mc.stdDelta
+                };
+            }
+
+            if (projectionChart) { projectionChart.destroy(); projectionChart = null; }
+            const ctx = canvas.getContext('2d');
+
+            const datasets = [
+                {
+                    label: 'Actual',
+                    data: actual,
+                    borderColor: 'rgba(229, 231, 235, 0.70)',
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    tension: 0.25,
+                    spanGaps: false
+                }
+            ];
+
+            if (band) {
+                datasets.push({
+                    label: 'P10',
+                    data: band.p10,
+                    borderColor: 'rgba(74, 222, 128, 0.0)',
+                    backgroundColor: 'rgba(74, 222, 128, 0.10)',
+                    pointRadius: 0,
+                    tension: 0.25,
+                    fill: '+1'
+                });
+                datasets.push({
+                    label: 'P90',
+                    data: band.p90,
+                    borderColor: 'rgba(74, 222, 128, 0.0)',
+                    backgroundColor: 'rgba(74, 222, 128, 0.10)',
+                    pointRadius: 0,
+                    tension: 0.25,
+                    fill: false
+                });
+            }
+
+            datasets.push({
+                label: band ? 'Median (MC)' : 'Projection',
+                data: projection,
+                borderColor: '#fbbf24',
+                borderWidth: 3,
+                borderDash: [8, 6],
+                pointRadius: 0,
+                tension: 0.25,
+                spanGaps: true
+            });
+
+            projectionChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 }
+                        },
+                        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${formatPct(c.parsed.y)}` } }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: (v) => `${Number(v).toFixed(1)}%` }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', autoSkip: true, maxRotation: 0, callback: (_, i) => formatMonthDay(labels[i]) }
+                        }
+                    }
+                }
+            });
+
+            if (!noteEl) return;
+            if (futureDates.length === 0) {
+                noteEl.textContent = 'Resolution date is at/before the last available holdings date; no forward projection shown.';
+                return;
+            }
+            if (modelKey === 'mc' && band) {
+                noteEl.textContent = `Monte Carlo uses daily basket-weight deltas (lookback ${lookback}d). Mean Δ=${band.meanDelta.toFixed(3)} pp, σ=${band.stdDelta.toFixed(3)} pp.`;
+                return;
+            }
+            noteEl.textContent = `Projection model: ${modelKey.toUpperCase()} (lookback ${lookback}d).`;
+        }
+
+        function setCards() {
+            const totalEl = document.getElementById('currentTotal');
+            const asOfEl = document.getElementById('currentAsOf');
+            const changeEl = document.getElementById('changeSinceStart');
+            const startNote = document.getElementById('startValueNote');
+            const daysEl = document.getElementById('daysToResolution');
+            const targetAvailEl = document.getElementById('targetAvailability');
+
+            const asOfDate = DATA?.basket?.asOfDate;
+            const holdingsLabel = DATA?.basket?.holdingsAsOfLabel;
+            const total = DATA?.basket?.totalWeight;
+            if (totalEl) totalEl.textContent = formatPct(total);
+            if (asOfEl) asOfEl.textContent = holdingsLabel ? `As of ${holdingsLabel}` : (asOfDate ? `As of ${asOfDate}` : 'As of —');
+
+            const labels = DATA?.series?.dates || [];
+            const totals = DATA?.series?.total || [];
+            const startLabel = clampLabelAfter(labels, QUESTION_PERIOD_START);
+            const startIdx = startLabel ? labels.indexOf(startLabel) : -1;
+            const startValue = startIdx >= 0 ? totals[startIdx] : null;
+            const lastValue = totals.length ? totals[totals.length - 1] : null;
+            const delta = (Number.isFinite(Number(lastValue)) && Number.isFinite(Number(startValue))) ? (Number(lastValue) - Number(startValue)) : null;
+            if (changeEl) changeEl.textContent = formatSignedPctPoints(delta);
+            if (startNote) startNote.textContent = startValue === null ? 'Start value unavailable' : `Start (${startLabel}): ${formatPct(startValue)}`;
+
+            const lastObj = asOfDate ? parseISODate(asOfDate) : null;
+            const resObj = parseISODate(RESOLUTION_DATE);
+            if (daysEl && lastObj && resObj) {
+                const diffMs = resObj.getTime() - lastObj.getTime();
+                const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+                daysEl.textContent = days >= 0 ? `${days} days` : 'Resolved';
+            }
+
+            if (targetAvailEl && DATA?.target) {
+                if (DATA.target.available) {
+                    targetAvailEl.textContent = `Target ${DATA.target.date}: ${formatPct(DATA.target.totalWeight)}`;
+                } else {
+                    targetAvailEl.textContent = `Target ${DATA.target.date}: not available yet`;
+                }
+            } else if (targetAvailEl) {
+                targetAvailEl.textContent = `Target ${RESOLUTION_DATE}: —`;
+            }
+        }
+
+        function buildHistoryCsv() {
+            const rows = [];
+            const tickers = DATA?.basket?.tickers || DEFAULT_TICKERS;
+            rows.push(['date', 'basket_total', ...tickers.map(t => `${t}_weight`)]);
+            const dates = DATA.series.dates;
+            for (let i = 0; i < dates.length; i += 1) {
+                const row = [dates[i], DATA.series.total[i]];
+                for (const t of tickers) row.push(DATA.series.byTicker?.[t]?.[i] ?? null);
+                rows.push(row);
+            }
+            return rows;
+        }
+
+        async function fetchData() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10_000);
+            try {
+                const todayIso = toISODate(new Date());
+                const asof = todayIso > RESOLUTION_DATE ? RESOLUTION_DATE : todayIso;
+                const url = `/.netlify/functions/ivv-holdings-weight?months=6&asof=${encodeURIComponent(asof)}&target=${encodeURIComponent(RESOLUTION_DATE)}`;
+                const res = await fetch(url, {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data || !data.series || !Array.isArray(data.series.dates)) throw new Error('Bad response');
+                return data;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('resolutionDatePill').textContent = RESOLUTION_DATE;
+            document.getElementById('periodStartPill').textContent = QUESTION_PERIOD_START;
+
+            const modelSelect = document.getElementById('projectionModel');
+            const zoomBtn = document.getElementById('zoomToPeriodBtn');
+            const resetBtn = document.getElementById('resetZoomBtn');
+            const dlBtn = document.getElementById('downloadHistoryBtn');
+
+            try {
+                DATA = await fetchData();
+                const lastUpdatedEl = document.getElementById('lastUpdated');
+                if (lastUpdatedEl) lastUpdatedEl.textContent = DATA.lastUpdated || '—';
+
+                renderWeightsTable({ tickers: DATA.basket.tickers, weights: DATA.basket.weights });
+                renderHistoryChart();
+                setCards();
+                renderProjectionChart(modelSelect ? modelSelect.value : 'linear');
+
+                if (dlBtn) {
+                    dlBtn.disabled = false;
+                    dlBtn.addEventListener('click', () => {
+                        const asOf = DATA?.basket?.asOfDate || 'asof';
+                        downloadCsv(`ivv_basket_weight_${asOf}.csv`, buildHistoryCsv());
+                    });
+                }
+            } catch (e) {
+                console.warn('IVV holdings fetch failed', e);
+                const lastUpdatedEl = document.getElementById('lastUpdated');
+                if (lastUpdatedEl) lastUpdatedEl.textContent = 'Unavailable (stale)';
+                const note = document.getElementById('historyNote');
+                if (note) note.textContent = 'Live data fetch failed. Try again later.';
+                const body = document.getElementById('weightsTableBody');
+                if (body) body.innerHTML = '<tr><td colspan="2" class="muted">Live data unavailable</td></tr>';
+            }
+
+            if (modelSelect) {
+                modelSelect.addEventListener('change', () => {
+                    if (!DATA) return;
+                    renderProjectionChart(modelSelect.value);
+                });
+            }
+
+            if (zoomBtn) {
+                zoomBtn.addEventListener('click', () => {
+                    const end = RESOLUTION_DATE;
+                    applyHistoryZoom({ minIso: QUESTION_PERIOD_START, maxIso: end });
+                });
+            }
+
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => resetHistoryZoom());
+            }
+        });
+    </script>
+</body>
+</html>
