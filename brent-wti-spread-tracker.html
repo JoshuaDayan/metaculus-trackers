@@ -93,6 +93,7 @@
             box-shadow: 0 18px 50px rgba(0,0,0,0.45);
         }
         .dropdown-title { color: #888; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; padding: 6px 8px 8px; }
+        .dropdown-subtitle { color: #888; font-size: 0.78rem; padding: 0 8px 10px; line-height: 1.35; }
         .menu-item {
             width: 100%;
             padding: 10px 10px;
@@ -284,6 +285,7 @@
                 <button class="nav-tab nav-btn" id="advancedBtn" type="button" aria-haspopup="menu" aria-expanded="false">View ▾</button>
                 <div class="dropdown" id="advancedMenu" role="menu" hidden>
                     <div class="dropdown-title">View</div>
+                    <div class="dropdown-subtitle">Basic = headline + YTD spread. Full = legs, basis window, sources.</div>
                     <button class="menu-item primary" type="button" data-advanced-toggle>Full dashboard</button>
                     <button class="menu-item" type="button" data-advanced-jump="legsChartContainer">WTI &amp; Brent legs <span class="menu-hint">↘</span></button>
                     <button class="menu-item" type="button" data-advanced-jump="basisTableContainer">Calibration basis <span class="menu-hint">↘</span></button>
@@ -314,21 +316,13 @@
                 <div class="overview-sub">
                     Live futures spread: <span class="mono" id="spreadLive">Loading…</span>
                 </div>
+                <div class="overview-hint"><strong>Last refresh:</strong> <span id="lastUpdated">Loading…</span></div>
             </div>
 
             <div class="overview-card">
                 <div class="overview-title">🏛️ Latest EIA spot spread</div>
                 <div class="overview-main"><span id="spreadEia">Loading…</span></div>
                 <div class="overview-sub">As-of: <span class="mono" id="eiaAsOf">Loading…</span></div>
-            </div>
-
-            <div class="overview-card warn" id="targetCard">
-                <div class="overview-title">🎯 Resolution target</div>
-                <div class="overview-sub"><span class="pill warn" id="targetStatus">PENDING</span></div>
-                <div class="overview-hint">
-                    Target date: <span class="mono">2026-03-04</span> • Interp deadline: <span class="mono">2026-03-14</span>
-                </div>
-                <div class="overview-hint"><strong>Last refresh:</strong> <span id="lastUpdated">Loading…</span></div>
             </div>
         </div>
 
@@ -351,15 +345,22 @@
 
             <div class="chart-container" id="basisTableContainer">
                 <h3 class="chart-title">🧪 Calibration basis (raw window)</h3>
-                <p class="chart-note">Raw basis = EIA spot − futures daily close (same date). Basis is smoothed via EWMA.</p>
+                <p class="chart-note">
+                    Each row shows <strong>raw basis</strong> on that date:
+                    <span class="mono">basis = EIA spot − Yahoo futures daily close</span> (USD/bbl).
+                    We smooth the window via EWMA (half-life 3 business days) to estimate today’s basis.
+                </p>
+                <p class="chart-note">
+                    Reading: positive basis ⇒ spot &gt; futures close; negative basis ⇒ spot &lt; futures close.
+                </p>
                 <table class="data-table" id="basisTable">
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>WTI raw basis</th>
-                            <th>Brent raw basis</th>
-                            <th>WTI (EIA / close)</th>
-                            <th>Brent (EIA / close)</th>
+                            <th>WTI basis (spot−fut)</th>
+                            <th>Brent basis (spot−fut)</th>
+                            <th>WTI spot / fut close</th>
+                            <th>Brent spot / fut close</th>
                         </tr>
                     </thead>
                     <tbody id="basisTableBody">
@@ -401,6 +402,39 @@
         let spreadChart = null;
         let legsChart = null;
 
+        const periodMarkerPlugin = {
+            id: 'periodMarker',
+            afterDraw(chart, _args, opts) {
+                const index = opts && Number.isFinite(opts.index) ? opts.index : null;
+                if (index === null) return;
+                const xScale = chart.scales && chart.scales.x;
+                const yScale = chart.scales && chart.scales.y;
+                if (!xScale || !yScale || typeof xScale.getPixelForTick !== 'function') return;
+
+                const x = xScale.getPixelForTick(index);
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.setLineDash([6, 6]);
+                ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x, yScale.top);
+                ctx.lineTo(x, yScale.bottom);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                const label = opts && typeof opts.label === 'string' ? opts.label : '';
+                if (label) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.70)';
+                    ctx.font = '12px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(label, x + 6, yScale.top + 6);
+                }
+                ctx.restore();
+            }
+        };
+
         function formatUsd(v) {
             if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
             return '$' + Number(v).toFixed(2);
@@ -418,13 +452,22 @@
             return d.toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
         }
 
+        function formatDay(dateStr) {
+            const d = new Date(`${dateStr}T00:00:00Z`);
+            if (Number.isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', timeZone: 'UTC' });
+        }
+
         function setAdvancedOpen(open) {
             const isOpen = Boolean(open);
             document.body.classList.toggle('advanced-open', isOpen);
             try { localStorage.setItem('sf_full_dashboard_v1', isOpen ? '1' : '0'); } catch {}
 
+            const btn = document.getElementById('advancedBtn');
+            if (btn) btn.textContent = `View: ${isOpen ? 'Full' : 'Basic'} ▾`;
+
             const toggleBtn = document.querySelector('[data-advanced-toggle]');
-            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
+            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Switch to Basic view' : 'Switch to Full dashboard';
 
             if (isOpen) {
                 requestAnimationFrame(() => {
@@ -452,7 +495,7 @@
                 menu.hidden = false;
                 btn.setAttribute('aria-expanded', 'true');
                 const toggleBtn = menu.querySelector('[data-advanced-toggle]');
-                if (toggleBtn) toggleBtn.textContent = document.body.classList.contains('advanced-open') ? 'Basic view' : 'Full dashboard';
+                if (toggleBtn) toggleBtn.textContent = document.body.classList.contains('advanced-open') ? 'Switch to Basic view' : 'Switch to Full dashboard';
             }
 
             btn.addEventListener('click', (e) => {
@@ -492,16 +535,26 @@
             const canvas = document.getElementById('spreadChart');
             if (!container || !canvas) return;
 
-            const series = data?.intraday?.calibrated?.spread || [];
-            const ts = data?.intraday?.timestamps || [];
-            if (!Array.isArray(series) || !Array.isArray(ts) || ts.length < 2 || series.length < 2) {
+            const dates = data?.history?.daily?.dates || [];
+            const series = data?.history?.daily?.calibrated_spread || [];
+            if (!Array.isArray(series) || !Array.isArray(dates) || dates.length < 2 || series.length < 2) {
                 if (noteEl) noteEl.textContent = 'Not enough data to render chart yet.';
                 return;
             }
 
-            const labels = ts.map(formatShort);
+            const labels = dates.map(formatDay);
+            const periodStart = data?.history?.period_start || null;
+            let periodIndex = null;
+            if (typeof periodStart === 'string' && periodStart.length === 10) {
+                const idx = dates.findIndex((d) => d >= periodStart);
+                if (idx >= 0) periodIndex = idx;
+            }
+
             if (noteEl) {
-                noteEl.textContent = `Range: last ${data.intraday.rangeDays} days • Interval: ${data.intraday.interval}`;
+                const start = dates[0];
+                const end = dates[dates.length - 1];
+                const dottedLabel = periodStart ? ` • Dotted line: ${formatDay(periodStart)}` : '';
+                noteEl.textContent = `Range: ${formatDay(start)} → ${formatDay(end)} (daily closes)${dottedLabel}`;
             }
 
             const ctx = canvas.getContext('2d');
@@ -509,6 +562,7 @@
 
             spreadChart = new Chart(ctx, {
                 type: 'line',
+                plugins: [periodMarkerPlugin],
                 data: {
                     labels,
                     datasets: [
@@ -530,6 +584,7 @@
                     maintainAspectRatio: false,
                     interaction: { mode: 'nearest', intersect: false },
                     plugins: {
+                        periodMarker: { index: periodIndex, label: periodStart ? `Period start (${formatDay(periodStart)})` : '' },
                         legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
                         tooltip: {
                             callbacks: {
@@ -624,35 +679,6 @@
             body.innerHTML = rows.join('');
         }
 
-        function setTargetStatus(resolution) {
-            const el = document.getElementById('targetStatus');
-            const card = document.getElementById('targetCard');
-            if (!el || !card) return;
-
-            const status = resolution?.status || 'pending';
-            if (status === 'exact') {
-                el.className = 'pill ok';
-                el.textContent = `EXACT: ${formatUsd(resolution.value)}`;
-                card.className = 'overview-card good';
-                return;
-            }
-            if (status === 'interpolated') {
-                el.className = 'pill ok';
-                el.textContent = `INTERP: ${formatUsd(resolution.value)}`;
-                card.className = 'overview-card good';
-                return;
-            }
-            if (status === 'unavailable') {
-                el.className = 'pill warn';
-                el.textContent = 'UNAVAILABLE';
-                card.className = 'overview-card warn';
-                return;
-            }
-            el.className = 'pill warn';
-            el.textContent = 'PENDING';
-            card.className = 'overview-card warn';
-        }
-
         async function fetchAndRender() {
             const lastUpdatedEl = document.getElementById('lastUpdated');
             try {
@@ -675,8 +701,6 @@
                 if (spreadLive) spreadLive.textContent = formatUsd(data?.spread?.live_futures);
                 if (spreadEia) spreadEia.textContent = formatUsd(data?.spread?.last_eia);
                 if (eiaAsOf) eiaAsOf.textContent = data?.spread?.last_eia_date || '—';
-
-                setTargetStatus(data?.metaculus?.resolution);
 
                 renderSpreadChart(data);
                 renderLegsChart(data);

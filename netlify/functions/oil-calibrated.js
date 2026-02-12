@@ -434,6 +434,40 @@ exports.handler = async () => {
     const mostRecentBasisDate = basisDates.length ? basisDates.at(-1) : null;
     const basisAgeDays = mostRecentBasisDate ? businessDaysBetween(mostRecentBasisDate, nowDateStr) : null;
 
+    const basisSpread = smoothedBasisBrent - smoothedBasisWti;
+
+    const now = new Date();
+    const yearStartStr = `${now.getUTCFullYear()}-01-01`;
+    const periodStartStr = `${nowDateStr.slice(0, 7)}-01`;
+
+    const dailyCommonDates = Object.keys(wtiDaily.closeByDate || {})
+      .filter((d) => Number.isFinite(wtiDaily.closeByDate[d]) && Number.isFinite(brentDaily.closeByDate?.[d]))
+      .filter((d) => d >= yearStartStr)
+      .sort();
+
+    const dailyHistory = {
+      dates: [],
+      futures_spread: [],
+      calibrated_spread: [],
+      eia_spread: [],
+    };
+
+    for (const date of dailyCommonDates) {
+      const wClose = wtiDaily.closeByDate[date];
+      const bClose = brentDaily.closeByDate[date];
+      if (!Number.isFinite(wClose) || !Number.isFinite(bClose)) continue;
+
+      const fSpread = bClose - wClose;
+      const eiaW = eiaWtiByDate?.[date];
+      const eiaB = eiaBrentByDate?.[date];
+      const eiaSpread = Number.isFinite(eiaW) && Number.isFinite(eiaB) ? eiaB - eiaW : null;
+
+      dailyHistory.dates.push(date);
+      dailyHistory.futures_spread.push(round2(fSpread));
+      dailyHistory.calibrated_spread.push(round2(fSpread + basisSpread));
+      dailyHistory.eia_spread.push(Number.isFinite(eiaSpread) ? round2(eiaSpread) : null);
+    }
+
     // Intraday series (best-effort) for charts. If Yahoo rejects intraday ranges/intervals, still
     // return the point-in-time calibrated values (page stays up).
     const intraday = {
@@ -454,7 +488,6 @@ exports.handler = async () => {
         .filter((ts) => brentIntra.byTs.has(ts))
         .sort((a, b) => a - b);
 
-      const basisSpread = smoothedBasisBrent - smoothedBasisWti;
       for (const ts of commonTs) {
         const w = wtiIntra.byTs.get(ts);
         const b = brentIntra.byTs.get(ts);
@@ -526,6 +559,11 @@ exports.handler = async () => {
           wti: rawBasisWtiAsc.map((p) => ({ date: p.date, raw_basis: round2(p.value), eia_spot: p.eiaSpot, futures_settle: p.futuresSettle })),
           brent: rawBasisBrentAsc.map((p) => ({ date: p.date, raw_basis: round2(p.value), eia_spot: p.eiaSpot, futures_settle: p.futuresSettle })),
         },
+      },
+      history: {
+        year_start: yearStartStr,
+        period_start: periodStartStr,
+        daily: dailyHistory,
       },
       intraday,
       source: {
