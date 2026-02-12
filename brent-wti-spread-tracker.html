@@ -121,6 +121,7 @@
             .brand { width: 100%; justify-content: center; }
             .nav-actions { width: 100%; justify-content: center; }
             .dropdown { right: 50%; transform: translateX(50%); }
+            .mini-chart-wrapper { height: 240px; }
         }
 
         header {
@@ -204,8 +205,10 @@
 
         .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
         .chart-note { color: #888; font-size: 0.85rem; margin-top: -12px; margin-bottom: 14px; }
+        .chart-subnote { color: #888; font-size: 0.85rem; margin-top: 16px; margin-bottom: 12px; }
         .chart-wrapper { position: relative; height: 420px; }
-        .mini-chart-wrapper { position: relative; height: 240px; margin-top: 14px; }
+        .basis-block { margin-top: 28px; }
+        .mini-chart-wrapper { position: relative; height: 300px; margin-top: 12px; }
 
         .dashboard-row {
             display: grid;
@@ -342,9 +345,11 @@
                 <div class="chart-wrapper">
                     <canvas id="legsChart"></canvas>
                 </div>
-                <p class="chart-note">Visual: raw basis window (dashed = today’s smoothed basis).</p>
-                <div class="mini-chart-wrapper">
-                    <canvas id="basisChart"></canvas>
+                <div class="basis-block">
+                    <p class="chart-subnote">Visual: raw basis window (dashed = today’s smoothed basis).</p>
+                    <div class="mini-chart-wrapper">
+                        <canvas id="basisChart"></canvas>
+                    </div>
                 </div>
             </div>
 
