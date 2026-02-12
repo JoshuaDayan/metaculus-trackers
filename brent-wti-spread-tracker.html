@@ -546,13 +546,15 @@
                 series = dailySeries;
             }
 
-            const labels = ts.map(formatShort);
+            const labels = ts.map((iso) => (typeof iso === 'string' ? iso.slice(0, 10) : ''));
 
             if (noteEl) {
                 const startIso = ts[0];
                 const endIso = ts[ts.length - 1];
                 const interval = data?.intraday?.interval || '—';
-                noteEl.textContent = `Range: ${formatShort(startIso)} → ${formatShort(endIso)} • Interval: ${interval}`;
+                const startDate = typeof startIso === 'string' ? startIso.slice(0, 10) : '';
+                const endDate = typeof endIso === 'string' ? endIso.slice(0, 10) : '';
+                noteEl.textContent = `Range: ${startDate} → ${endDate} • Interval: ${interval}`;
             }
 
             const ctx = canvas.getContext('2d');
@@ -584,6 +586,10 @@
                         legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
                         tooltip: {
                             callbacks: {
+                                title: (items) => {
+                                    const idx = items && items[0] ? items[0].dataIndex : null;
+                                    return idx !== null && idx !== undefined ? labels[idx] : '';
+                                },
                                 label: (ctx) => `${ctx.dataset.label}: ${formatUsd(ctx.parsed.y)}`
                             }
                         }
@@ -595,7 +601,17 @@
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+                            ticks: {
+                                color: '#888',
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 10,
+                                callback: (val) => {
+                                    const idx = Number(val);
+                                    const dateStr = Number.isFinite(idx) ? labels[idx] : null;
+                                    return typeof dateStr === 'string' ? formatDay(dateStr) : '';
+                                }
+                            }
                         }
                     }
                 }
