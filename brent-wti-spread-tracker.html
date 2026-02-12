@@ -93,6 +93,7 @@
             box-shadow: 0 18px 50px rgba(0,0,0,0.45);
         }
         .dropdown-title { color: #888; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; padding: 6px 8px 8px; }
+        .dropdown-subtitle { color: #888; font-size: 0.78rem; padding: 0 8px 10px; line-height: 1.35; }
         .menu-item {
             width: 100%;
             padding: 10px 10px;
@@ -120,6 +121,7 @@
             .brand { width: 100%; justify-content: center; }
             .nav-actions { width: 100%; justify-content: center; }
             .dropdown { right: 50%; transform: translateX(50%); }
+            .mini-chart-wrapper { height: 240px; }
         }
 
         header {
@@ -203,7 +205,10 @@
 
         .chart-title { font-size: 1.1rem; margin-bottom: 20px; color: #fff; }
         .chart-note { color: #888; font-size: 0.85rem; margin-top: -12px; margin-bottom: 14px; }
+        .chart-subnote { color: #888; font-size: 0.85rem; margin-top: 16px; margin-bottom: 12px; }
         .chart-wrapper { position: relative; height: 420px; }
+        .basis-block { margin-top: 28px; }
+        .mini-chart-wrapper { position: relative; height: 300px; margin-top: 12px; }
 
         .dashboard-row {
             display: grid;
@@ -282,12 +287,13 @@
 
             <div class="nav-actions">
                 <button class="nav-tab nav-btn" id="advancedBtn" type="button" aria-haspopup="menu" aria-expanded="false">View ▾</button>
-                <div class="dropdown" id="advancedMenu" role="menu" hidden>
+                    <div class="dropdown" id="advancedMenu" role="menu" hidden>
                     <div class="dropdown-title">View</div>
+                    <div class="dropdown-subtitle">Basic = headline + spread chart. Full = legs, basis window, sources (remembers your choice).</div>
                     <button class="menu-item primary" type="button" data-advanced-toggle>Full dashboard</button>
                     <button class="menu-item" type="button" data-advanced-jump="legsChartContainer">WTI &amp; Brent legs <span class="menu-hint">↘</span></button>
                     <button class="menu-item" type="button" data-advanced-jump="basisTableContainer">Calibration basis <span class="menu-hint">↘</span></button>
-                    <button class="menu-item" type="button" data-advanced-jump="verify">Verify &amp; sources <span class="menu-hint">↘</span></button>
+                    <button class="menu-item" type="button" data-advanced-jump="verify">Wordcel comment <span class="menu-hint">↘</span></button>
                 </div>
             </div>
         </div>
@@ -314,21 +320,13 @@
                 <div class="overview-sub">
                     Live futures spread: <span class="mono" id="spreadLive">Loading…</span>
                 </div>
+                <div class="overview-hint"><strong>Last refresh:</strong> <span id="lastUpdated">Loading…</span></div>
             </div>
 
             <div class="overview-card">
                 <div class="overview-title">🏛️ Latest EIA spot spread</div>
                 <div class="overview-main"><span id="spreadEia">Loading…</span></div>
                 <div class="overview-sub">As-of: <span class="mono" id="eiaAsOf">Loading…</span></div>
-            </div>
-
-            <div class="overview-card warn" id="targetCard">
-                <div class="overview-title">🎯 Resolution target</div>
-                <div class="overview-sub"><span class="pill warn" id="targetStatus">PENDING</span></div>
-                <div class="overview-hint">
-                    Target date: <span class="mono">2026-03-04</span> • Interp deadline: <span class="mono">2026-03-14</span>
-                </div>
-                <div class="overview-hint"><strong>Last refresh:</strong> <span id="lastUpdated">Loading…</span></div>
             </div>
         </div>
 
@@ -347,19 +345,32 @@
                 <div class="chart-wrapper">
                     <canvas id="legsChart"></canvas>
                 </div>
+                <div class="basis-block">
+                    <p class="chart-subnote">Visual: raw basis window (dashed = today’s smoothed basis).</p>
+                    <div class="mini-chart-wrapper">
+                        <canvas id="basisChart"></canvas>
+                    </div>
+                </div>
             </div>
 
             <div class="chart-container" id="basisTableContainer">
                 <h3 class="chart-title">🧪 Calibration basis (raw window)</h3>
-                <p class="chart-note">Raw basis = EIA spot − futures daily close (same date). Basis is smoothed via EWMA.</p>
+                <p class="chart-note">
+                    Each row shows <strong>raw basis</strong> on that date:
+                    <span class="mono">basis = EIA spot − Yahoo futures daily close</span> (USD/bbl).
+                    We smooth the window via EWMA (half-life 3 business days) to estimate today’s basis.
+                </p>
+                <p class="chart-note">
+                    Reading: positive basis ⇒ spot &gt; futures close; negative basis ⇒ spot &lt; futures close.
+                </p>
                 <table class="data-table" id="basisTable">
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>WTI raw basis</th>
-                            <th>Brent raw basis</th>
-                            <th>WTI (EIA / close)</th>
-                            <th>Brent (EIA / close)</th>
+                            <th>WTI basis (spot−fut)</th>
+                            <th>Brent basis (spot−fut)</th>
+                            <th>WTI spot / fut close</th>
+                            <th>Brent spot / fut close</th>
                         </tr>
                     </thead>
                     <tbody id="basisTableBody">
@@ -370,7 +381,7 @@
         </div>
 
         <div class="info-section advanced-only" id="verify">
-            <h3>✅ Data sources &amp; methodology</h3>
+            <h3>📝 Wordcel Statistician's Comment</h3>
             <p>
                 <strong>Ground truth / resolution source:</strong>
                 EIA daily spot prices (WTI “Cushing, Oklahoma” = <span class="mono">RWTC</span>, Brent “Europe” = <span class="mono">RBRTE</span>).
@@ -391,8 +402,7 @@
             </p>
             <p>
                 Verify on EIA:
-                <a href="https://api.eia.gov/v2/petroleum/pri/spt/data/" target="_blank" rel="noopener noreferrer">EIA API v2 endpoint</a>
-                · <a href="https://www.eia.gov/opendata/" target="_blank" rel="noopener noreferrer">Get an API key</a>
+                <a href="https://www.eia.gov/dnav/pet/pet_pri_spt_s1_d.htm" target="_blank" rel="noopener noreferrer">Spot prices (WTI Cushing &amp; Brent Europe)</a>
             </p>
         </div>
     </div>
@@ -400,6 +410,7 @@
     <script>
         let spreadChart = null;
         let legsChart = null;
+        let basisChart = null;
 
         function formatUsd(v) {
             if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
@@ -418,17 +429,27 @@
             return d.toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
         }
 
+        function formatDay(dateStr) {
+            const d = new Date(`${dateStr}T00:00:00Z`);
+            if (Number.isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', timeZone: 'UTC' });
+        }
+
         function setAdvancedOpen(open) {
             const isOpen = Boolean(open);
             document.body.classList.toggle('advanced-open', isOpen);
             try { localStorage.setItem('sf_full_dashboard_v1', isOpen ? '1' : '0'); } catch {}
 
+            const btn = document.getElementById('advancedBtn');
+            if (btn) btn.textContent = `View: ${isOpen ? 'Full' : 'Basic'} ▾`;
+
             const toggleBtn = document.querySelector('[data-advanced-toggle]');
-            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Basic view' : 'Full dashboard';
+            if (toggleBtn) toggleBtn.textContent = isOpen ? 'Switch to Basic view' : 'Switch to Full dashboard';
 
             if (isOpen) {
                 requestAnimationFrame(() => {
                     try { if (legsChart && typeof legsChart.resize === 'function') legsChart.resize(); } catch {}
+                    try { if (basisChart && typeof basisChart.resize === 'function') basisChart.resize(); } catch {}
                 });
             }
         }
@@ -452,7 +473,7 @@
                 menu.hidden = false;
                 btn.setAttribute('aria-expanded', 'true');
                 const toggleBtn = menu.querySelector('[data-advanced-toggle]');
-                if (toggleBtn) toggleBtn.textContent = document.body.classList.contains('advanced-open') ? 'Basic view' : 'Full dashboard';
+                if (toggleBtn) toggleBtn.textContent = document.body.classList.contains('advanced-open') ? 'Switch to Basic view' : 'Switch to Full dashboard';
             }
 
             btn.addEventListener('click', (e) => {
@@ -492,16 +513,48 @@
             const canvas = document.getElementById('spreadChart');
             if (!container || !canvas) return;
 
-            const series = data?.intraday?.calibrated?.spread || [];
-            const ts = data?.intraday?.timestamps || [];
-            if (!Array.isArray(series) || !Array.isArray(ts) || ts.length < 2 || series.length < 2) {
-                if (noteEl) noteEl.textContent = 'Not enough data to render chart yet.';
-                return;
+            const tsAll = data?.intraday?.timestamps || [];
+            const seriesAll = data?.intraday?.calibrated?.spread || [];
+            const periodStart = data?.history?.period_start || null;
+
+            let ts = tsAll;
+            let series = seriesAll;
+
+            if (typeof periodStart === 'string' && periodStart.length === 10 && Array.isArray(tsAll) && Array.isArray(seriesAll)) {
+                const fTs = [];
+                const fSeries = [];
+                for (let i = 0; i < Math.min(tsAll.length, seriesAll.length); i += 1) {
+                    const iso = tsAll[i];
+                    if (typeof iso !== 'string') continue;
+                    if (iso.slice(0, 10) < periodStart) continue;
+                    fTs.push(iso);
+                    fSeries.push(seriesAll[i]);
+                }
+                ts = fTs;
+                series = fSeries;
             }
 
-            const labels = ts.map(formatShort);
+            // Fallback to daily history if intraday is unavailable.
+            if (!Array.isArray(series) || !Array.isArray(ts) || ts.length < 2 || series.length < 2) {
+                const dates = data?.history?.daily?.dates || [];
+                const dailySeries = data?.history?.daily?.calibrated_spread || [];
+                if (!Array.isArray(dates) || !Array.isArray(dailySeries) || dates.length < 2 || dailySeries.length < 2) {
+                    if (noteEl) noteEl.textContent = 'Not enough data to render chart yet.';
+                    return;
+                }
+                ts = dates.map((d) => `${d}T00:00:00.000Z`);
+                series = dailySeries;
+            }
+
+            const labels = ts.map((iso) => (typeof iso === 'string' ? iso.slice(0, 10) : ''));
+
             if (noteEl) {
-                noteEl.textContent = `Range: last ${data.intraday.rangeDays} days • Interval: ${data.intraday.interval}`;
+                const startIso = ts[0];
+                const endIso = ts[ts.length - 1];
+                const interval = data?.intraday?.interval || '—';
+                const startDate = typeof startIso === 'string' ? startIso.slice(0, 10) : '';
+                const endDate = typeof endIso === 'string' ? endIso.slice(0, 10) : '';
+                noteEl.textContent = `Range: ${startDate} → ${endDate} • Interval: ${interval}`;
             }
 
             const ctx = canvas.getContext('2d');
@@ -533,6 +586,10 @@
                         legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
                         tooltip: {
                             callbacks: {
+                                title: (items) => {
+                                    const idx = items && items[0] ? items[0].dataIndex : null;
+                                    return idx !== null && idx !== undefined ? labels[idx] : '';
+                                },
                                 label: (ctx) => `${ctx.dataset.label}: ${formatUsd(ctx.parsed.y)}`
                             }
                         }
@@ -544,7 +601,17 @@
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+                            ticks: {
+                                color: '#888',
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 10,
+                                callback: (val) => {
+                                    const idx = Number(val);
+                                    const dateStr = Number.isFinite(idx) ? labels[idx] : null;
+                                    return typeof dateStr === 'string' ? formatDay(dateStr) : '';
+                                }
+                            }
                         }
                     }
                 }
@@ -560,7 +627,7 @@
             const brent = data?.intraday?.calibrated?.brent || [];
             if (!Array.isArray(ts) || ts.length < 2) return;
 
-            const labels = ts.map(formatShort);
+            const labels = ts.map((iso) => (typeof iso === 'string' ? iso.slice(0, 10) : ''));
             const ctx = canvas.getContext('2d');
             if (legsChart) { legsChart.destroy(); legsChart = null; }
 
@@ -579,11 +646,84 @@
                     interaction: { mode: 'nearest', intersect: false },
                     plugins: {
                         legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    const idx = items && items[0] ? items[0].dataIndex : null;
+                                    const iso = idx !== null && idx !== undefined ? ts[idx] : null;
+                                    return typeof iso === 'string' ? formatShort(iso) : '';
+                                },
+                                label: (ctx) => `${ctx.dataset.label}: ${formatUsd(ctx.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#888', callback: (v) => '$' + Number(v).toFixed(2) } },
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: '#888',
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 6,
+                                callback: (val) => {
+                                    const idx = Number(val);
+                                    const dateStr = Number.isFinite(idx) ? labels[idx] : null;
+                                    return typeof dateStr === 'string' ? formatDay(dateStr) : '';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderBasisChart(data) {
+            const canvas = document.getElementById('basisChart');
+            if (!canvas) return;
+
+            const wtiRaw = data?.basis?.raw?.wti || [];
+            const brentRaw = data?.basis?.raw?.brent || [];
+            if (!Array.isArray(wtiRaw) || !Array.isArray(brentRaw) || !wtiRaw.length || !brentRaw.length) return;
+
+            const byDate = {};
+            for (const r of wtiRaw) byDate[r.date] = { date: r.date, wti: r };
+            for (const r of brentRaw) {
+                byDate[r.date] = byDate[r.date] || { date: r.date };
+                byDate[r.date].brent = r;
+            }
+
+            const datesAsc = Object.keys(byDate).sort();
+            const wtiSeries = datesAsc.map((d) => (byDate[d].wti ? Number(byDate[d].wti.raw_basis) : null));
+            const brentSeries = datesAsc.map((d) => (byDate[d].brent ? Number(byDate[d].brent.raw_basis) : null));
+            const smWti = Number(data?.wti?.smoothed_basis);
+            const smBrent = Number(data?.brent?.smoothed_basis);
+
+            const ctx = canvas.getContext('2d');
+            if (basisChart) { basisChart.destroy(); basisChart = null; }
+
+            basisChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datesAsc.map(formatDay),
+                    datasets: [
+                        { label: 'WTI raw basis', data: wtiSeries, borderColor: 'rgba(229, 231, 235, 0.85)', borderWidth: 2, pointRadius: 0, tension: 0.2 },
+                        { label: 'Brent raw basis', data: brentSeries, borderColor: '#7b2cbf', borderWidth: 2.2, pointRadius: 0, tension: 0.2 },
+                        ...(Number.isFinite(smWti) ? [{ label: 'WTI smoothed', data: datesAsc.map(() => smWti), borderColor: 'rgba(229, 231, 235, 0.55)', borderDash: [6, 6], borderWidth: 1.5, pointRadius: 0 }] : []),
+                        ...(Number.isFinite(smBrent) ? [{ label: 'Brent smoothed', data: datesAsc.map(() => smBrent), borderColor: 'rgba(123, 44, 191, 0.55)', borderDash: [6, 6], borderWidth: 1.5, pointRadius: 0 }] : []),
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'bottom', labels: { color: '#bbb', usePointStyle: true, boxWidth: 10, padding: 14 } },
                         tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatUsd(ctx.parsed.y)}` } }
                     },
                     scales: {
                         y: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#888', callback: (v) => '$' + Number(v).toFixed(2) } },
-                        x: { grid: { display: false }, ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } }
+                        x: { grid: { display: false }, ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } }
                     }
                 }
             });
@@ -624,35 +764,6 @@
             body.innerHTML = rows.join('');
         }
 
-        function setTargetStatus(resolution) {
-            const el = document.getElementById('targetStatus');
-            const card = document.getElementById('targetCard');
-            if (!el || !card) return;
-
-            const status = resolution?.status || 'pending';
-            if (status === 'exact') {
-                el.className = 'pill ok';
-                el.textContent = `EXACT: ${formatUsd(resolution.value)}`;
-                card.className = 'overview-card good';
-                return;
-            }
-            if (status === 'interpolated') {
-                el.className = 'pill ok';
-                el.textContent = `INTERP: ${formatUsd(resolution.value)}`;
-                card.className = 'overview-card good';
-                return;
-            }
-            if (status === 'unavailable') {
-                el.className = 'pill warn';
-                el.textContent = 'UNAVAILABLE';
-                card.className = 'overview-card warn';
-                return;
-            }
-            el.className = 'pill warn';
-            el.textContent = 'PENDING';
-            card.className = 'overview-card warn';
-        }
-
         async function fetchAndRender() {
             const lastUpdatedEl = document.getElementById('lastUpdated');
             try {
@@ -676,11 +787,10 @@
                 if (spreadEia) spreadEia.textContent = formatUsd(data?.spread?.last_eia);
                 if (eiaAsOf) eiaAsOf.textContent = data?.spread?.last_eia_date || '—';
 
-                setTargetStatus(data?.metaculus?.resolution);
-
                 renderSpreadChart(data);
                 renderLegsChart(data);
                 renderBasisTable(data);
+                renderBasisChart(data);
             } catch (e) {
                 if (lastUpdatedEl) lastUpdatedEl.textContent = 'Unavailable (stale)';
                 const noteEl = document.getElementById('spreadChartNote');
