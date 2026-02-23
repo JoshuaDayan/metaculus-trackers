@@ -789,15 +789,15 @@
             body.innerHTML = rows.join('');
         }
 
-        async function fetchAndRender() {
-            const lastUpdatedEl = document.getElementById('lastUpdated');
-            try {
-                const res = await fetch('/.netlify/functions/oil-calibrated', { cache: 'no-store' });
-                let data = null;
-                try { data = await res.json(); } catch {}
-                if (!res.ok) {
-                    const msg = data && (data.message || data.error) ? `${data.error || 'error'}: ${data.message || ''}` : `HTTP ${res.status}`;
-                    throw new Error(msg);
+	        async function fetchAndRender() {
+	            const lastUpdatedEl = document.getElementById('lastUpdated');
+	            try {
+	                const res = await fetch('/.netlify/functions/oil-calibrated');
+	                let data = null;
+	                try { data = await res.json(); } catch {}
+	                if (!res.ok) {
+	                    const msg = data && (data.message || data.error) ? `${data.error || 'error'}: ${data.message || ''}` : `HTTP ${res.status}`;
+	                    throw new Error(msg);
                 }
 
                 if (lastUpdatedEl) lastUpdatedEl.textContent = data.lastUpdated || '—';
