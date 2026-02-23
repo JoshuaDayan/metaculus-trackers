@@ -31,6 +31,7 @@ const INTRADAY_RANGE = "1mo";
 
 const DEFAULT_CDN_CACHE_SECONDS = 10 * 60; // 10 minutes
 const DEFAULT_STALE_WHILE_REVALIDATE_SECONDS = 24 * 60 * 60; // 1 day
+const DEFAULT_STALE_IF_ERROR_SECONDS = 24 * 60 * 60; // 1 day
 
 function parseISODate(dateStr) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
@@ -370,17 +371,17 @@ exports.handler = async () => {
     const fetchedAt = new Date().toISOString();
     const nowDateStr = toISODate(new Date());
 
-    const eia = await fetchEiaSpot({ apiKey, length: EIA_FETCH_LENGTH });
-    const eiaWtiByDate = eia.bySeries[EIA_SERIES_WTI] || {};
-    const eiaBrentByDate = eia.bySeries[EIA_SERIES_BRENT] || {};
-
     const endExclusive = addDays(new Date(), 1);
     const startInclusive = addDays(endExclusive, -DAILY_FETCH_LOOKBACK_DAYS);
 
-    const [wtiDaily, brentDaily] = await Promise.all([
+    const [eia, wtiDaily, brentDaily] = await Promise.all([
+      fetchEiaSpot({ apiKey, length: EIA_FETCH_LENGTH }),
       fetchYahooDailyCloses(YAHOO_SYMBOL_WTI, startInclusive, endExclusive),
       fetchYahooDailyCloses(YAHOO_SYMBOL_BRENT, startInclusive, endExclusive),
     ]);
+
+    const eiaWtiByDate = eia.bySeries[EIA_SERIES_WTI] || {};
+    const eiaBrentByDate = eia.bySeries[EIA_SERIES_BRENT] || {};
 
     // Raw basis window: last N common EIA dates where we also have the futures close.
     const commonEiaDates = Object.keys(eiaWtiByDate)
@@ -499,9 +500,16 @@ exports.handler = async () => {
           intraday.interval = attempt.interval;
           intraday.range = attempt.range;
           break;
-        } catch {
+        } catch (err) {
           wtiIntra = null;
           brentIntra = null;
+          const msg = err instanceof Error ? err.message : String(err);
+          const isTimeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+          const isParamIssue =
+            msg.includes("Yahoo chart error") ||
+            /Yahoo request failed for .*: (400|422)\b/.test(msg);
+          // If it's not an obvious params/range/interval issue, fail fast and fall back to daily history.
+          if (isTimeout || !isParamIssue) throw err;
         }
       }
 
@@ -617,7 +625,7 @@ exports.handler = async () => {
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         "Cache-Control": "public, max-age=0, must-revalidate",
-        "Netlify-CDN-Cache-Control": `public, max-age=${DEFAULT_CDN_CACHE_SECONDS}, stale-while-revalidate=${DEFAULT_STALE_WHILE_REVALIDATE_SECONDS}`,
+        "Netlify-CDN-Cache-Control": `public, max-age=${DEFAULT_CDN_CACHE_SECONDS}, stale-while-revalidate=${DEFAULT_STALE_WHILE_REVALIDATE_SECONDS}, stale-if-error=${DEFAULT_STALE_IF_ERROR_SECONDS}`,
       },
       body: JSON.stringify(body),
     };
