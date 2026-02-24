@@ -241,6 +241,8 @@
         }
 
         body.advanced-open .row { grid-template-columns: 1.35fr 0.65fr; }
+        .row.single { grid-template-columns: 1fr; }
+        body.advanced-open .row.single { grid-template-columns: 1fr; }
 
         @media (max-width: 1100px) {
             .row { grid-template-columns: 1fr; }
@@ -403,10 +405,10 @@
             </div>
         </section>
 
-        <section class="row">
+        <section class="row single">
             <div class="panel">
                 <div class="panel-header">
-                    <h2>Live basket weight (estimated, pre/after-hours)</h2>
+                    <h2>Live basket weight (intraday estimate)</h2>
                 </div>
                 <div class="chart-wrap" style="height: 320px;">
                     <canvas id="liveChart"></canvas>
@@ -418,7 +420,7 @@
         <section class="row">
             <div class="panel">
                 <div class="panel-header">
-                    <h2>Basket weight (last 6 months)</h2>
+                    <h2>Official holdings snapshots (last 6 months)</h2>
                     <div class="btns">
                         <button id="zoomToPeriodBtn" type="button" disabled>Zoom to question period</button>
                         <button id="resetZoomBtn" type="button" disabled>Reset zoom</button>
@@ -818,30 +820,33 @@
 	            body.appendChild(trTotal);
 	        }
 
-	        function updateHistoryNote() {
-	            const noteEl = document.getElementById('historyNote');
-	            if (!noteEl || !historyChart) return;
+        function updateHistoryNote() {
+            const noteEl = document.getElementById('historyNote');
+            if (!noteEl || !historyChart) return;
 
-	            const labels = Array.isArray(historyChart.data?.labels) ? historyChart.data.labels : [];
-	            if (!labels.length) {
-	                noteEl.textContent = '';
-	                return;
-	            }
+            const labels = Array.isArray(historyChart.data?.labels) ? historyChart.data.labels : [];
+            if (!labels.length) {
+                noteEl.textContent = '';
+                return;
+            }
 
-	            const minOpt = historyChart.options?.scales?.x?.min;
-	            const maxOpt = historyChart.options?.scales?.x?.max;
-	            const minLabel = (minOpt !== undefined && minOpt !== null) ? labelForCategoryTick(labels, minOpt) : labels[0];
-	            const maxLabel = (maxOpt !== undefined && maxOpt !== null) ? labelForCategoryTick(labels, maxOpt) : labels[labels.length - 1];
+            const minOpt = historyChart.options?.scales?.x?.min;
+            const maxOpt = historyChart.options?.scales?.x?.max;
+            const minLabel = (minOpt !== undefined && minOpt !== null) ? labelForCategoryTick(labels, minOpt) : labels[0];
+            const maxLabel = (maxOpt !== undefined && maxOpt !== null) ? labelForCategoryTick(labels, maxOpt) : labels[labels.length - 1];
 
-	            const parts = [`Showing ${formatMonthDayYear(minLabel)} → ${formatMonthDayYear(maxLabel)}.`];
-	            const denseFrom = DATA?.sampling?.denseFrom;
-	            const strideDays = DATA?.sampling?.coarseStrideDays;
-	            if (denseFrom && strideDays) {
-	                parts.push(`Sampling: daily from ${denseFrom}; older dates downsampled (≈ every ${strideDays} weekdays).`);
-	            }
+            const parts = [
+                `Official iShares holdings snapshots.`,
+                `Showing ${formatMonthDayYear(minLabel)} → ${formatMonthDayYear(maxLabel)}.`,
+            ];
+            const denseFrom = DATA?.sampling?.denseFrom;
+            const strideDays = DATA?.sampling?.coarseStrideDays;
+            if (denseFrom && strideDays) {
+                parts.push(`Sampling: daily from ${denseFrom}; older dates downsampled (≈ every ${strideDays} weekdays).`);
+            }
 
-	            noteEl.textContent = parts.join(' ');
-	        }
+            noteEl.textContent = parts.join(' ');
+        }
 
 	        function renderHistoryChart() {
 	            const canvas = document.getElementById('historyChart');
@@ -1147,10 +1152,33 @@
             const series = liveData?.live?.basketWeight || [];
             if (!labels.length || !series.length) return;
 
+            const numeric = series.filter((v) => Number.isFinite(Number(v))).map((v) => Number(v));
+            const minVal = numeric.length ? Math.min(...numeric) : null;
+            const maxVal = numeric.length ? Math.max(...numeric) : null;
+            let yMin = null;
+            let yMax = null;
+            if (minVal !== null && maxVal !== null) {
+                const range = Math.max(0, maxVal - minVal);
+                const pad = Math.max(0.25, range * 0.6);
+                let lo = minVal - pad;
+                let hi = maxVal + pad;
+                if (hi - lo < 0.5) {
+                    const mid = (hi + lo) / 2;
+                    lo = mid - 0.25;
+                    hi = mid + 0.25;
+                }
+                yMin = Math.max(0, lo);
+                yMax = Math.min(100, hi);
+            }
+
             const ctx = canvas.getContext('2d');
             if (liveChart) {
                 liveChart.data.labels = labels;
                 liveChart.data.datasets[0].data = series;
+                if (yMin !== null && yMax !== null) {
+                    liveChart.options.scales.y.min = yMin;
+                    liveChart.options.scales.y.max = yMax;
+                }
                 liveChart.update('none');
                 return;
             }
@@ -1188,7 +1216,12 @@
                         }
                     },
                     scales: {
-                        y: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#888', callback: (v) => `${Number(v).toFixed(2)}%` } },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: (v) => `${Number(v).toFixed(2)}%` },
+                            min: yMin !== null ? yMin : undefined,
+                            max: yMax !== null ? yMax : undefined
+                        },
                         x: {
                             grid: { display: false },
                             ticks: { color: '#888', autoSkip: true, maxRotation: 0, maxTicksLimit: 8 }
@@ -1212,7 +1245,7 @@
                 const interval = liveData?.live?.interval || '—';
                 const range = liveData?.live?.range || '—';
                 const holdingsLabel = liveData?.basket?.holdingsAsOfLabel || liveData?.basket?.asOfDate || '—';
-                liveNote.textContent = `Prices: ${range} @ ${interval} (pre/post on) • Holdings snapshot: ${holdingsLabel}`;
+                liveNote.textContent = `Estimated from intraday Yahoo prices (${range} @ ${interval}, pre/post) + latest iShares holdings (${holdingsLabel}).`;
             }
         }
 
