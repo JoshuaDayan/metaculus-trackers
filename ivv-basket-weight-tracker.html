@@ -414,6 +414,7 @@
                     <canvas id="liveChart"></canvas>
                 </div>
                 <div class="note" id="liveNote">Loading live prices…</div>
+                <div class="note" id="errorBandNote"></div>
             </div>
         </section>
 
@@ -1145,6 +1146,30 @@
             }
         }
 
+        async function fetchErrorBand() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 12_000);
+            try {
+                const res = await fetch('/.netlify/functions/ivv-error-band', {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data || typeof data.max_abs_error_pp !== 'number') throw new Error('Bad response');
+                return data;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        function formatSigned(value) {
+            if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+            const n = Number(value);
+            const sign = n >= 0 ? '+' : '';
+            return `${sign}${n.toFixed(2)} pp`;
+        }
+
         function renderLiveChart(liveData) {
             const canvas = document.getElementById('liveChart');
             if (!canvas) return;
@@ -1249,6 +1274,21 @@
             }
         }
 
+        async function updateErrorBandNote() {
+            const note = document.getElementById('errorBandNote');
+            if (!note) return;
+            try {
+                const data = await fetchErrorBand();
+                const minErr = formatSigned(data.min_error_pp);
+                const maxErr = formatSigned(data.max_error_pp);
+                const maxAbs = Number.isFinite(Number(data.max_abs_error_pp)) ? Number(data.max_abs_error_pp).toFixed(2) : '—';
+                const start = data.start || '—';
+                note.textContent = `Tracking error band since ${start}: ${minErr} to ${maxErr} (max abs ${maxAbs} pp).`;
+            } catch {
+                note.textContent = '';
+            }
+        }
+
         async function refreshLive() {
             if (liveInFlight) return;
             liveInFlight = true;
@@ -1320,6 +1360,7 @@
             }
 
             startLiveUpdates();
+            updateErrorBandNote();
 
             if (modelSelect) {
                 modelSelect.addEventListener('change', () => {
