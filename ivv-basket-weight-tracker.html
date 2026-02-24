@@ -241,6 +241,8 @@
         }
 
         body.advanced-open .row { grid-template-columns: 1.35fr 0.65fr; }
+        .row.single { grid-template-columns: 1fr; }
+        body.advanced-open .row.single { grid-template-columns: 1fr; }
 
         @media (max-width: 1100px) {
             .row { grid-template-columns: 1fr; }
@@ -387,6 +389,11 @@
                 <div class="card-sub muted" id="currentAsOf">As of —</div>
             </div>
             <div class="card">
+                <div class="card-title">Live basket weight (est.)</div>
+                <div class="card-value" id="liveBasketNow">—</div>
+                <div class="card-sub muted" id="liveBasketNote">Updates every 60s</div>
+            </div>
+            <div class="card">
                 <div class="card-title">Change since period start</div>
                 <div class="card-value" id="changeSinceStart">—</div>
                 <div class="card-sub muted" id="startValueNote">Start value —</div>
@@ -398,10 +405,22 @@
             </div>
         </section>
 
+        <section class="row single">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Live basket weight (intraday estimate)</h2>
+                </div>
+                <div class="chart-wrap" style="height: 320px;">
+                    <canvas id="liveChart"></canvas>
+                </div>
+                <div class="note" id="liveNote">Loading live prices…</div>
+            </div>
+        </section>
+
         <section class="row">
             <div class="panel">
                 <div class="panel-header">
-                    <h2>Basket weight (last 6 months)</h2>
+                    <h2>Official holdings snapshots (last 6 months)</h2>
                     <div class="btns">
                         <button id="zoomToPeriodBtn" type="button" disabled>Zoom to question period</button>
                         <button id="resetZoomBtn" type="button" disabled>Reset zoom</button>
@@ -473,6 +492,7 @@
         const RESOLUTION_DATE = '2026-02-27';
         const QUESTION_PERIOD_START = '2026-02-01';
         const DEFAULT_TICKERS = ['NVDA', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'META', 'AMD'];
+        const LIVE_REFRESH_MS = 60_000;
 
         function parseISODate(dateStr) {
             const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
@@ -510,6 +530,12 @@
             const d = parseISODate(isoDate);
             if (!d) return isoDate;
             return d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: '2-digit', year: 'numeric' });
+        }
+
+        function formatIntradayLabel(iso) {
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return '';
+            return d.toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         }
 
         function formatPct(v) {
@@ -692,6 +718,9 @@
         let historyChart = null;
         let projectionChart = null;
         let DATA = null;
+        let liveChart = null;
+        let liveTimer = null;
+        let liveInFlight = false;
 
         function setAdvancedOpen(open) {
             const isOpen = Boolean(open);
@@ -791,30 +820,33 @@
 	            body.appendChild(trTotal);
 	        }
 
-	        function updateHistoryNote() {
-	            const noteEl = document.getElementById('historyNote');
-	            if (!noteEl || !historyChart) return;
+        function updateHistoryNote() {
+            const noteEl = document.getElementById('historyNote');
+            if (!noteEl || !historyChart) return;
 
-	            const labels = Array.isArray(historyChart.data?.labels) ? historyChart.data.labels : [];
-	            if (!labels.length) {
-	                noteEl.textContent = '';
-	                return;
-	            }
+            const labels = Array.isArray(historyChart.data?.labels) ? historyChart.data.labels : [];
+            if (!labels.length) {
+                noteEl.textContent = '';
+                return;
+            }
 
-	            const minOpt = historyChart.options?.scales?.x?.min;
-	            const maxOpt = historyChart.options?.scales?.x?.max;
-	            const minLabel = (minOpt !== undefined && minOpt !== null) ? labelForCategoryTick(labels, minOpt) : labels[0];
-	            const maxLabel = (maxOpt !== undefined && maxOpt !== null) ? labelForCategoryTick(labels, maxOpt) : labels[labels.length - 1];
+            const minOpt = historyChart.options?.scales?.x?.min;
+            const maxOpt = historyChart.options?.scales?.x?.max;
+            const minLabel = (minOpt !== undefined && minOpt !== null) ? labelForCategoryTick(labels, minOpt) : labels[0];
+            const maxLabel = (maxOpt !== undefined && maxOpt !== null) ? labelForCategoryTick(labels, maxOpt) : labels[labels.length - 1];
 
-	            const parts = [`Showing ${formatMonthDayYear(minLabel)} → ${formatMonthDayYear(maxLabel)}.`];
-	            const denseFrom = DATA?.sampling?.denseFrom;
-	            const strideDays = DATA?.sampling?.coarseStrideDays;
-	            if (denseFrom && strideDays) {
-	                parts.push(`Sampling: daily from ${denseFrom}; older dates downsampled (≈ every ${strideDays} weekdays).`);
-	            }
+            const parts = [
+                `Official iShares holdings snapshots.`,
+                `Showing ${formatMonthDayYear(minLabel)} → ${formatMonthDayYear(maxLabel)}.`,
+            ];
+            const denseFrom = DATA?.sampling?.denseFrom;
+            const strideDays = DATA?.sampling?.coarseStrideDays;
+            if (denseFrom && strideDays) {
+                parts.push(`Sampling: daily from ${denseFrom}; older dates downsampled (≈ every ${strideDays} weekdays).`);
+            }
 
-	            noteEl.textContent = parts.join(' ');
-	        }
+            noteEl.textContent = parts.join(' ');
+        }
 
 	        function renderHistoryChart() {
 	            const canvas = document.getElementById('historyChart');
@@ -1096,6 +1128,151 @@
             }
         }
 
+        async function fetchLiveData() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 12_000);
+            try {
+                const res = await fetch('/.netlify/functions/ivv-live-basket', {
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data || !data.live || !Array.isArray(data.live.timestamps)) throw new Error('Bad response');
+                return data;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        function renderLiveChart(liveData) {
+            const canvas = document.getElementById('liveChart');
+            if (!canvas) return;
+            const labels = (liveData?.live?.timestamps || []).map((iso) => formatIntradayLabel(iso));
+            const series = liveData?.live?.basketWeight || [];
+            if (!labels.length || !series.length) return;
+
+            const numeric = series.filter((v) => Number.isFinite(Number(v))).map((v) => Number(v));
+            const minVal = numeric.length ? Math.min(...numeric) : null;
+            const maxVal = numeric.length ? Math.max(...numeric) : null;
+            let yMin = null;
+            let yMax = null;
+            if (minVal !== null && maxVal !== null) {
+                const range = Math.max(0, maxVal - minVal);
+                const pad = Math.max(0.25, range * 0.6);
+                let lo = minVal - pad;
+                let hi = maxVal + pad;
+                if (hi - lo < 0.5) {
+                    const mid = (hi + lo) / 2;
+                    lo = mid - 0.25;
+                    hi = mid + 0.25;
+                }
+                yMin = Math.max(0, lo);
+                yMax = Math.min(100, hi);
+            }
+
+            const ctx = canvas.getContext('2d');
+            if (liveChart) {
+                liveChart.data.labels = labels;
+                liveChart.data.datasets[0].data = series;
+                if (yMin !== null && yMax !== null) {
+                    liveChart.options.scales.y.min = yMin;
+                    liveChart.options.scales.y.max = yMax;
+                }
+                liveChart.update('none');
+                return;
+            }
+
+            liveChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Live basket weight (est.)',
+                            data: series,
+                            borderColor: '#00d4ff',
+                            borderWidth: 2.4,
+                            pointRadius: 0,
+                            tension: 0.25
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    const idx = items && items[0] ? items[0].dataIndex : null;
+                                    const iso = idx !== null && idx !== undefined ? liveData.live.timestamps[idx] : null;
+                                    return iso ? formatIntradayLabel(iso) + ' UTC' : '';
+                                },
+                                label: (ctx) => `Basket weight: ${formatPct(ctx.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            ticks: { color: '#888', callback: (v) => `${Number(v).toFixed(2)}%` },
+                            min: yMin !== null ? yMin : undefined,
+                            max: yMax !== null ? yMax : undefined
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#888', autoSkip: true, maxRotation: 0, maxTicksLimit: 8 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateLiveCards(liveData) {
+            const nowEl = document.getElementById('liveBasketNow');
+            const noteEl = document.getElementById('liveBasketNote');
+            const liveNote = document.getElementById('liveNote');
+            const latest = liveData?.live?.latest;
+            if (nowEl) nowEl.textContent = formatPct(latest?.weight);
+            if (noteEl && latest?.timestamp) {
+                noteEl.textContent = `As of ${formatIntradayLabel(latest.timestamp)} UTC`;
+            }
+
+            if (liveNote) {
+                const interval = liveData?.live?.interval || '—';
+                const range = liveData?.live?.range || '—';
+                const holdingsLabel = liveData?.basket?.holdingsAsOfLabel || liveData?.basket?.asOfDate || '—';
+                liveNote.textContent = `Estimated from intraday Yahoo prices (${range} @ ${interval}, pre/post) + latest iShares holdings (${holdingsLabel}).`;
+            }
+        }
+
+        async function refreshLive() {
+            if (liveInFlight) return;
+            liveInFlight = true;
+            try {
+                const liveData = await fetchLiveData();
+                renderLiveChart(liveData);
+                updateLiveCards(liveData);
+            } catch (e) {
+                const liveNote = document.getElementById('liveNote');
+                if (liveNote) liveNote.textContent = 'Live data fetch failed. Try again shortly.';
+            } finally {
+                liveInFlight = false;
+            }
+        }
+
+        function startLiveUpdates() {
+            refreshLive();
+            if (liveTimer) clearInterval(liveTimer);
+            liveTimer = setInterval(() => {
+                if (document.hidden) return;
+                refreshLive();
+            }, LIVE_REFRESH_MS);
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             initAdvancedMenu();
             document.getElementById('resolutionDatePill').textContent = RESOLUTION_DATE;
@@ -1141,6 +1318,8 @@
                 const body = document.getElementById('weightsTableBody');
                 if (body) body.innerHTML = '<tr><td colspan="2" class="muted">Live data unavailable</td></tr>';
             }
+
+            startLiveUpdates();
 
             if (modelSelect) {
                 modelSelect.addEventListener('change', () => {
