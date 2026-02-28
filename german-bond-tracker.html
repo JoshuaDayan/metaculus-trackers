@@ -925,6 +925,8 @@
         let BASELINE_YIELD = 2.85;  // Jan 30, 2026 (Bundesbank)
         let CURRENT_YIELD = 2.88;     // fallback only; live fetch will overwrite
         const THRESHOLD_BP = 20;      // ±20 basis points
+        const PERIOD_START = '2026-02-01';
+        const PERIOD_LAST_TRADING_DAY = '2026-02-27';
 	        let LIVE_SERIES = null;
 	        let COMPARISON_DATA = null;
 	        let MONTHLY_FLAGS_DATA = null;
@@ -961,6 +963,33 @@
             const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1));
             if (Number.isNaN(d.getTime())) return monthStr;
             return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+        }
+
+        function getPeriodStats(upperTrigger, lowerTrigger) {
+            const points = Array.isArray(LIVE_SERIES)
+                ? LIVE_SERIES.filter((p) => p.date >= PERIOD_START && p.date <= PERIOD_LAST_TRADING_DAY)
+                : [];
+
+            let minYield = null;
+            let maxYield = null;
+            let breach = null;
+
+            for (const p of points) {
+                if (minYield === null || p.yield < minYield) minYield = p.yield;
+                if (maxYield === null || p.yield > maxYield) maxYield = p.yield;
+                if (!breach && (p.yield >= upperTrigger || p.yield <= lowerTrigger)) {
+                    breach = {
+                        date: p.date,
+                        yield: p.yield,
+                        direction: p.yield >= upperTrigger ? 'upper' : 'lower'
+                    };
+                }
+            }
+
+            const lastDate = points.length ? points[points.length - 1].date : null;
+            const periodComplete = lastDate && lastDate >= PERIOD_LAST_TRADING_DAY;
+
+            return { points, minYield, maxYield, breach, periodComplete };
         }
 
         function csvEscape(value) {
@@ -1663,10 +1692,8 @@
             const upperTrigger = BASELINE_YIELD + (THRESHOLD_BP / 100);
             const lowerTrigger = BASELINE_YIELD - (THRESHOLD_BP / 100);
 
-            // Check if threshold breached
-            const breachedUpper = CURRENT_YIELD >= upperTrigger;
-            const breachedLower = CURRENT_YIELD <= lowerTrigger;
-            const breached = breachedUpper || breachedLower;
+            const periodStats = getPeriodStats(upperTrigger, lowerTrigger);
+            const breached = Boolean(periodStats.breach);
 
             // Distance to nearest threshold
             const distanceToUpper = Math.round((upperTrigger - CURRENT_YIELD) * 100);
@@ -1684,7 +1711,13 @@
                 banner.className = 'resolution-banner yes';
                 statusValue.className = 'resolution-value yes';
                 statusValue.textContent = 'YES';
-                statusExplanation.textContent = `Threshold breached! Yield moved ${Math.abs(changeBp)}bp from baseline.`;
+                const breachDate = periodStats.breach ? formatMonthDay(periodStats.breach.date) : '—';
+                statusExplanation.textContent = `Threshold breached on ${breachDate}.`;
+            } else if (periodStats.periodComplete) {
+                banner.className = 'resolution-banner no';
+                statusValue.className = 'resolution-value no';
+                statusValue.textContent = 'NO';
+                statusExplanation.textContent = 'February ended without a ±20bp move.';
             } else {
                 banner.className = 'resolution-banner pending';
                 statusValue.className = 'resolution-value pending';

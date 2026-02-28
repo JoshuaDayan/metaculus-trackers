@@ -133,6 +133,14 @@
             border: 1px solid rgba(255,255,255,0.08);
         }
 
+        .title-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
         h1 {
             font-size: 2rem;
             margin-bottom: 10px;
@@ -140,6 +148,21 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(16, 185, 129, 0.18);
+            color: #a7f3d0;
         }
 
         .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
@@ -320,7 +343,10 @@
 
     <div class="container">
         <header>
-            <h1>🛢️ Brent − WTI Spot Spread Tracker</h1>
+            <div class="title-row">
+                <h1>🛢️ Brent − WTI Spot Spread Tracker</h1>
+                <span class="status-badge" id="oilResolutionBadge" hidden>Resolved</span>
+            </div>
             <p class="subtitle">
                 <a href="https://www.metaculus.com/questions/41689/brent-minus-wti-on-mar-4-2026/" target="_blank" rel="noopener noreferrer">
                     Metaculus Question: Brent − WTI spot spread on March 4, 2026 (EIA)
@@ -789,10 +815,27 @@
             body.innerHTML = rows.join('');
         }
 
-	        async function fetchAndRender() {
-	            const lastUpdatedEl = document.getElementById('lastUpdated');
-	            try {
-	                const res = await fetch('/.netlify/functions/oil-calibrated');
+        function updateResolutionBadge(data) {
+            const badge = document.getElementById('oilResolutionBadge');
+            if (!badge) return;
+            const status = data?.metaculus?.resolution?.status || 'pending';
+            if (status === 'exact') {
+                badge.textContent = 'Resolved';
+                badge.hidden = false;
+                return;
+            }
+            if (status === 'interpolated') {
+                badge.textContent = 'Resolved (Interpolated)';
+                badge.hidden = false;
+                return;
+            }
+            badge.hidden = true;
+        }
+
+        async function fetchAndRender() {
+            const lastUpdatedEl = document.getElementById('lastUpdated');
+            try {
+                const res = await fetch('/.netlify/functions/oil-calibrated');
 	                let data = null;
 	                try { data = await res.json(); } catch {}
 	                if (!res.ok) {
@@ -816,6 +859,7 @@
                 renderLegsChart(data);
                 renderBasisTable(data);
                 renderBasisChart(data);
+                updateResolutionBadge(data);
             } catch (e) {
                 if (lastUpdatedEl) lastUpdatedEl.textContent = 'Unavailable (stale)';
                 const noteEl = document.getElementById('spreadChartNote');

@@ -146,6 +146,14 @@
             border: 1px solid rgba(255,255,255,0.08);
         }
 
+        .title-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
         h1 {
             font-size: 2rem;
             margin-bottom: 10px;
@@ -153,6 +161,21 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(16, 185, 129, 0.18);
+            color: #a7f3d0;
         }
 
         .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
@@ -359,7 +382,10 @@
     <div class="container">
 
         <header>
-            <h1>📈 AI Companies’ S&amp;P 500 Weight Tracker</h1>
+            <div class="title-row">
+                <h1>📈 AI Companies’ S&amp;P 500 Weight Tracker</h1>
+                <span class="status-badge" id="ivvResolutionBadge" hidden>Resolved</span>
+            </div>
             <p class="subtitle">
                 <a href="https://www.metaculus.com/questions/41341/ai-companies-sp-500-weight-on-feb-27-2026/" target="_blank" rel="noopener noreferrer">
                     Metaculus Question: AI companies’ S&amp;P 500 weight on Feb 27, 2026
@@ -1274,6 +1300,17 @@
             }
         }
 
+        function updateIvvResolutionBadge() {
+            const badge = document.getElementById('ivvResolutionBadge');
+            if (!badge) return;
+            const asOfDate = DATA?.basket?.asOfDate;
+            if (asOfDate && asOfDate >= RESOLUTION_DATE) {
+                badge.hidden = false;
+            } else {
+                badge.hidden = true;
+            }
+        }
+
         async function updateErrorBandNote() {
             const note = document.getElementById('errorBandNote');
             if (!note) return;
@@ -1361,6 +1398,7 @@
 
             startLiveUpdates();
             updateErrorBandNote();
+            updateIvvResolutionBadge();
 
             if (modelSelect) {
                 modelSelect.addEventListener('change', () => {
