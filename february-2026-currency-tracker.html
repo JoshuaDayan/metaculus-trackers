@@ -366,7 +366,8 @@
 	        .overview-sub { font-size: 0.9rem; color: #cfd6e6; margin-top: 6px; }
 	        .overview-hint { font-size: 0.8rem; color: #888; margin-top: 8px; line-height: 1.4; }
 
-	        .leader-change { font-size: 1.2rem; font-weight: 800; margin-top: 8px; }
+        .leader-change { font-size: 1.2rem; font-weight: 800; margin-top: 8px; }
+        .leader-note { margin-top: 6px; font-size: 0.85rem; color: #9aa3b2; }
 	        .leader-change.positive { color: #4ade80; }
 	        .leader-change.negative { color: #f87171; }
 
@@ -633,11 +634,12 @@
 	        </header>
 
 	        <div class="overview-row">
-	            <div id="leaderBanner" class="overview-card leader-card">
-	                <div class="overview-title">🏆 Current leader</div>
-	                <div class="overview-main" id="leaderCurrency">Loading…</div>
-	                <div class="leader-change" id="leaderChange">Loading…</div>
-	            </div>
+            <div id="leaderBanner" class="overview-card leader-card">
+                <div class="overview-title" id="leaderTitle">🏆 Current leader</div>
+                <div class="overview-main" id="leaderCurrency">Loading…</div>
+                <div class="leader-change" id="leaderChange">Loading…</div>
+                <div class="leader-note" id="leaderNote"></div>
+            </div>
 
 	            <div class="overview-card">
 	                <div class="overview-title">📌 Baseline → As-of</div>
@@ -808,6 +810,8 @@
         // Baseline: January 30, 2026 (Friday close — Jan 31 was Saturday)
         let BASELINE_DATE = '2026-01-30';
         let ASOF_DATE = '2026-02-03'; // fallback only; live fetch will overwrite
+        const FINAL_ASOF_DATE = '2026-02-27';
+        const RESOLUTION_TIME_UTC = '2026-03-01T19:00:00Z'; // 2 PM ET
 
         // Fallback snapshot (used only if live fetch fails)
         let BASELINE = {
@@ -1056,17 +1060,32 @@
 	        }
 	
 	        // Render functions
-	        function renderLeader(results) {
-	            const leader = results[0];
-	            const isPositive = leader.change >= 0;
-	            const banner = document.getElementById('leaderBanner');
-	            if (banner) banner.className = `overview-card leader-card${isPositive ? '' : ' negative'}`;
+        function renderLeader(results) {
+            const leader = results[0];
+            const isPositive = leader.change >= 0;
+            const banner = document.getElementById('leaderBanner');
+            if (banner) banner.className = `overview-card leader-card${isPositive ? '' : ' negative'}`;
 
-	            document.getElementById('leaderCurrency').textContent =
-	                `${CURRENCIES[leader.code].flag} ${leader.code} (${CURRENCIES[leader.code].name})`;
-	            document.getElementById('leaderChange').textContent = formatPercent(leader.change);
-	            document.getElementById('leaderChange').className =
-	                `leader-change ${isPositive ? 'positive' : 'negative'}`;
+            const titleEl = document.getElementById('leaderTitle');
+            const noteEl = document.getElementById('leaderNote');
+            const finalAsOf = ASOF_DATE >= FINAL_ASOF_DATE;
+            const resolutionReached = Date.now() >= new Date(RESOLUTION_TIME_UTC).getTime();
+            if (titleEl) titleEl.textContent = finalAsOf ? '🏆 Final leader' : '🏆 Current leader';
+            if (noteEl) {
+                if (finalAsOf && resolutionReached) {
+                    noteEl.textContent = 'Final based on Feb 27 close (resolution time reached).';
+                } else if (finalAsOf) {
+                    noteEl.textContent = 'Final based on Feb 27 close (official resolution Mar 1, 2 PM ET).';
+                } else {
+                    noteEl.textContent = 'Updating with latest available close.';
+                }
+            }
+
+            document.getElementById('leaderCurrency').textContent =
+                `${CURRENCIES[leader.code].flag} ${leader.code} (${CURRENCIES[leader.code].name})`;
+            document.getElementById('leaderChange').textContent = formatPercent(leader.change);
+            document.getElementById('leaderChange').className =
+                `leader-change ${isPositive ? 'positive' : 'negative'}`;
 	        }
 
         function renderCards(results) {
